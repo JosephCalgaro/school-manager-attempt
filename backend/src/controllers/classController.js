@@ -157,3 +157,22 @@ export async function deleteClass(req, res) {
     res.status(500).json({ error: 'Erro ao remover turma' })
   }
 }
+
+// DELETE /classes/:id/students/:studentId - remover aluno da turma
+export async function removeStudentFromClass(req, res) {
+  const { id: classId, studentId } = req.params
+
+  try {
+    const [result] = await pool.query(
+      'DELETE FROM class_students WHERE class_id = ? AND student_id = ?',
+      [classId, studentId]
+    )
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Aluno não encontrado nesta turma' })
+    }
+    res.json({ message: 'Aluno removido da turma com sucesso' })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Erro ao remover aluno da turma' })
+  }
+}

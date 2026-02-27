@@ -211,3 +211,21 @@ export function validateClassPayload(data) {
   }
   return errors
 }
+
+// Validação de campos da tarefa (assignment)
+export function validateAssignmentPayload(data) {
+  const errors = []
+  validateRequired(errors, data.title, 'Título da tarefa é obrigatório')
+  validateRequired(errors, data.dueDate, 'Data de vencimento da tarefa é obrigatória')
+  validateWithRule(errors, data.dueDate, isValidDate, 'Data de vencimento da tarefa inválida')
+  validateRequired(errors, data.classId, 'Turma da tarefa é obrigatória')
+  return errors
+}
+
+export function validateAssignmentUpdatePayload(data) {
+  const errors = []
+  if (data.dueDate) {
+    validateWithRule(errors, data.dueDate, isValidDate, 'Data de vencimento da tarefa inválida')
+  }
+  return errors
+}
