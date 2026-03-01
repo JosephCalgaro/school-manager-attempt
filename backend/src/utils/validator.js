@@ -107,12 +107,7 @@ validateWithRule(errors, data.cpf, isValidCPF, 'CPF inválido')
 validateRequired(errors, data.rg, 'RG é obrigatório')
 
 validateRequired(errors, data.birthDate, 'Data de nascimento é obrigatória')
-validateWithRule(
-    errors,
-    data.birthDate,
-    isValidDate,
-    'Data de nascimento inválida'
-)
+validateWithRule(errors, data.birthDate, isValidDate, 'Data de nascimento inválida')
 
 validateRequired(errors, data.address, 'Endereço é obrigatório')
 
@@ -226,6 +221,42 @@ export function validateAssignmentUpdatePayload(data) {
   const errors = []
   if (data.dueDate) {
     validateWithRule(errors, data.dueDate, isValidDate, 'Data de vencimento da tarefa inválida')
+  }
+  return errors
+}
+
+export function validateResponsiblePayload(data){
+  const errors = []
+  validateRequired(errors, data.fullName, 'Nome completo do responsável é obrigatório')
+  validateRequired(errors, data.cpf, isRequired, 'CPF do responsável é obrigatório')
+  validateWithRule(errors, data.cpf, isValidCPF, 'CPF do responsável inválido')
+  validateRequired(errors, data.rg, isRequired, 'RG do responsável é obrigatório')
+  validateRequired(errors, data.email, 'Email do responsável é obrigatório')
+  validateWithRule(errors, data.email, isValidEmail, 'Email do responsável inválido')
+  return errors
+}
+
+export function validateResponsibleUpdatePayload(data){
+  const errors = []
+  if (data.fullName !== undefined && !isRequired(data.fullName)) {
+    errors.push('Nome completo do responsável é obrigatório quando enviado')
+  }
+  if (data.cpf !== undefined) {
+    if (!isRequired(data.cpf)) {
+      errors.push('CPF do responsável é obrigatório quando enviado')
+    } else if (!isValidCPF(data.cpf)) {
+      errors.push('CPF do responsável inválido')
+    }
+  }
+  if (data.rg !== undefined && !isRequired(data.rg)) {
+    errors.push('RG do responsável é obrigatório quando enviado')
+  }
+  if (data.email !== undefined) {
+    if (!isRequired(data.email)) {
+      errors.push('Email do responsável é obrigatório quando enviado')
+    } else if (!isValidEmail(data.email)) {
+      errors.push('Email do responsável inválido')
+    }
   }
   return errors
 }

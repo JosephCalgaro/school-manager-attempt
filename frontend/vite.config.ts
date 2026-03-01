@@ -16,7 +16,9 @@ export default defineConfig({
     }),
   ],
   server: {
+    allowedHosts: 'all',
     proxy: {
+    "/admin": "http://localhost:3333",
     "/auth": "http://localhost:3333",
     "/students": "http://localhost:3333",
     "/users": "http://localhost:3333",

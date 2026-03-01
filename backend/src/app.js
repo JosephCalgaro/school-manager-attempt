@@ -22,8 +22,14 @@ import authRoutes from './routes/authRoutes.js'
 // Importa rotas de turmas
 import classRoutes from './routes/classRoutes.js'
 
+// Importa rotas de responsáveis
+import responsiblesRoutes from './routes/responsiblesRoutes.js'
+
 // Importa rotas de tarefas
 import assignmentRoutes from './routes/assignmentRoutes.js'
+
+// Importa rotas administrativas
+import adminRoutes from './routes/adminRoutes.js'
 
 // Cria a aplicação Express
 const app = express()
@@ -45,6 +51,12 @@ app.use('/classes', authenticate, classRoutes)
 
 // Protege e monta as rotas de tarefas /assignments
 app.use('/assignments', authenticate, assignmentRoutes)
+
+// Protege e monta as rotas de responsáveis /responsibles
+app.use('/responsibles', authenticate, responsiblesRoutes)
+
+// Protege e monta as rotas administrativas /admin
+app.use('/admin', authenticate, adminRoutes)
 
 // Monta as rotas de autenticação no caminho /auth
 app.use('/auth', authRoutes)

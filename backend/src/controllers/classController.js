@@ -50,9 +50,9 @@ export async function getClasses(req, res) {
     const [rows] = await pool.query(
       `SELECT c.id, c.name, c.schedule, c.teacher_id,
               u.full_name AS teacher_name
-       FROM classes c
-       JOIN users u ON c.teacher_id = u.id
-       ORDER BY c.name`
+      FROM classes c
+      JOIN users u ON c.teacher_id = u.id
+      ORDER BY c.name`
     )
     res.json(rows)
   } catch (err) {
@@ -69,9 +69,9 @@ export async function getClassById(req, res) {
     const [classRows] = await pool.query(
       `SELECT c.id, c.name, c.schedule, c.teacher_id,
               u.full_name AS teacher_name, u.email AS teacher_email
-       FROM classes c
-       JOIN users u ON c.teacher_id = u.id
-       WHERE c.id = ?`,
+      FROM classes c
+      JOIN users u ON c.teacher_id = u.id
+      WHERE c.id = ?`,
       [classId]
     )
     if (classRows.length === 0) {
@@ -81,9 +81,9 @@ export async function getClassById(req, res) {
     // busca alunos matriculados
     const [studentRows] = await pool.query(
       `SELECT s.id, s.full_name AS fullName, s.email
-       FROM students s
-       JOIN class_students cs ON cs.student_id = s.id
-       WHERE cs.class_id = ?`,
+      FROM students s
+      JOIN class_students cs ON cs.student_id = s.id
+      WHERE cs.class_id = ?`,
       [classId]
     )
 
