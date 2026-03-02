@@ -169,49 +169,7 @@ school-manager/
 - `GET /assignments` - Listar tarefas
 - `GET /responsibles` - Listar responsáveis
 
-## 🛠️ Variáveis de Ambiente
 
-### Backend (.env)
-```
-PORT=3333
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=Joecal300422@@
-DB_NAME=school_manager
-DB_PORT=3306
-JWT_SECRET=school_manager_jwt_secret_2026
-```
-
-## 📝 Notas Importantes
-
-1. **Proxy do Vite**: O frontend redireciona requisições para `/auth`, `/students`, etc. ao backend em `localhost:3333`
-2. **CORS**: O backend tem CORS habilitado para aceitar requisições do frontend
-3. **JWT**: Token válido por 10 horas
-4. **Senha do Admin**: `admin123` (hash bcrypt já inserido no banco)
-
-## 🎨 Personalizações Disponíveis
-
-- **Tema**: Toggle entre light/dark mode no header
-- **Sidebar**: Pode ser expandida/recolhida
-- **Responsivo**: Funciona em mobile, tablet e desktop
-
-## 📞 Suporte
-
-Para adicionar novos usuários, execute:
-
-```bash
-mysql -u root -p'Joecal300422@@' school_manager -e "
-INSERT INTO users (full_name, email, password_hash, role, is_active) 
-VALUES ('Nome do Usuário', 'email@example.com', 'HASH_BCRYPT', 'teacher', 1);
-"
-```
-
-Para gerar um hash bcrypt da senha, use:
-```bash
-node -e "const bcrypt = require('bcryptjs'); console.log(bcrypt.hashSync('sua_senha', 10));"
-```
-
----
 
 **Versão:** 1.0.0  
 **Data:** 28/02/2026  
