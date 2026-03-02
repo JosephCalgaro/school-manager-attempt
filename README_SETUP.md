@@ -74,11 +74,6 @@ CREATE TABLE IF NOT EXISTS responsibles (
 );
 SQL
 
-# Inserir usuário de teste (senha: admin123)
-mysql -u root -p'Joecal300422@@' school_manager -e "
-INSERT INTO users (full_name, email, password_hash, role, is_active) 
-VALUES ('Administrador', 'admin@school.com', '\$2b\$10\$4OBy/JxQ44kKYJvrM93HsulZUpwFGOfSu0AgNUak/s7DAXYTAkYJe', 'admin', 1)
-ON DUPLICATE KEY UPDATE full_name = full_name;
 "
 ```
 
@@ -102,8 +97,8 @@ npm run dev
 
 ## 🔐 Credenciais de Teste
 
-**Email:** admin@school.com  
-**Senha:** admin123
+**Email:** email.temp@google.com 
+**Senha:** SenhaForte123
 
 ## 📁 Estrutura do Projeto
 
