@@ -4,13 +4,7 @@
 
 Este é um sistema de gerenciamento escolar com autenticação JWT, integração frontend-backend e interface moderna com Tailwind CSS.
 
-### ✨ Modificações Implementadas
 
-1. **✅ Autenticação Conectada**: O formulário de login agora se conecta ao backend via API REST
-2. **✅ Proteção de Rotas**: Apenas usuários autenticados podem acessar o dashboard
-3. **✅ Categoria "Exemplo"**: Todas as páginas do template foram agrupadas em uma nova categoria na sidebar
-4. **✅ Categoria "VIP"**: Nova categoria com recursos especiais marcados como "new"
-5. **✅ UserDropdown Atualizado**: Mostra dados do usuário logado e permite logout
 
 ## 🚀 Como Executar
 
@@ -21,14 +15,6 @@ Este é um sistema de gerenciamento escolar com autenticação JWT, integração
 
 ### 1. Configurar o Banco de Dados
 
-```bash
-# Criar banco de dados
-mysql -u root -p'Joecal300422@@' <<'SQL'
-CREATE DATABASE IF NOT EXISTS school_manager CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-SQL
-
-# Criar tabelas
-mysql -u root -p'Joecal300422@@' school_manager <<'SQL'
 CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   full_name VARCHAR(255) NOT NULL,
@@ -74,13 +60,6 @@ CREATE TABLE IF NOT EXISTS responsibles (
 );
 SQL
 
-# Inserir usuário de teste (senha: admin123)
-mysql -u root -p'Joecal300422@@' school_manager -e "
-INSERT INTO users (full_name, email, password_hash, role, is_active) 
-VALUES ('Administrador', 'admin@school.com', '\$2b\$10\$4OBy/JxQ44kKYJvrM93HsulZUpwFGOfSu0AgNUak/s7DAXYTAkYJe', 'admin', 1)
-ON DUPLICATE KEY UPDATE full_name = full_name;
-"
-```
 
 ### 2. Iniciar o Backend
 
@@ -100,10 +79,6 @@ npm run dev
 # O site estará disponível em http://localhost:5173
 ```
 
-## 🔐 Credenciais de Teste
-
-**Email:** admin@school.com  
-**Senha:** admin123
 
 ## 📁 Estrutura do Projeto
 
@@ -146,10 +121,6 @@ school-manager/
 - Componente que verifica se o usuário tem token
 - Redireciona para `/signin` se não autenticado
 
-### 3. **Sidebar Atualizada (AppSidebar.tsx)**
-- **Menu**: Dashboard, Calendário, Perfil, Formulários, Tabelas, Páginas
-- **Exemplo**: Gráficos, Elementos UI, Autenticação, Formulários, Tabelas, Calendário, Perfil, Páginas
-- **VIP**: Área VIP, Tarefas VIP, Recursos VIP (com badge "new")
 
 ### 4. **UserDropdown Integrado (UserDropdown.tsx)**
 - Mostra nome e email do usuário logado

@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthProvider";
 import SignIn from "./pages/AuthPages/SignIn";
 import NotFound from "./pages/OtherPage/NotFound";
@@ -22,6 +22,10 @@ import ProtectedRoute from "./components/auth/ProtectedRoute";
 import AdminDashboard from "./pages/AdminPages/AdminDashboard";
 import AdminStudents from "./pages/AdminPages/AdminStudents";
 import AdminUsers from "./pages/AdminPages/AdminUsers";
+import AdminClasses from "./pages/AdminPages/AdminClasses";
+import AdminClassDetail from "./pages/AdminPages/AdminClassDetail";
+import TeacherDashboard from "./pages/TeacherPages/TeacherDashboard";
+import TeacherClassDetail from "./pages/TeacherPages/TeacherClassDetail";
 
 export default function App() {
   return (
@@ -66,6 +70,14 @@ export default function App() {
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/students" element={<AdminStudents />} />
             <Route path="/admin/users" element={<AdminUsers />} />
+            <Route path="/admin/classes" element={<AdminClasses />} />
+            <Route path="/admin/classes/:id" element={<AdminClassDetail />} />
+
+            {/* Teacher Pages */}
+            <Route path="/teacher" element={<TeacherDashboard />} />
+            <Route path="/teacher/classes/:id" element={<TeacherClassDetail />} />
+            {/* <Route path="/teacher/students" element={<TeacherStudents />} /> */}
+            {/*<Route path="/teacher/users" element={<TeacherUsers />} /> */}
           </Route>
 
           {/* Auth Layout */}

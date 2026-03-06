@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { ChevronDownIcon } from '../../icons';
 import { LuSearch, LuX } from 'react-icons/lu';
 
 interface Student {
@@ -8,6 +7,7 @@ interface Student {
   full_name: string;
   cpf: string;
   email: string;
+  phone?: string | null;
   birth_date: string;
   address: string;
   created_at: string;
@@ -15,12 +15,18 @@ interface Student {
 
 interface StudentDetails extends Student {
   rg: string;
-  responsible_id: number;
+  due_day?: number;
+  responsible_id: number | null;
   responsible?: {
+    id?: number;
     full_name: string;
+    cpf?: string;
+    rg?: string;
+    birth_date?: string;
+    address?: string;
     email: string;
-    phone: string;
-  };
+    phone?: string | null;
+  } | null;
 }
 
 interface StudentClasses {
@@ -60,6 +66,50 @@ interface StudentDetailsData {
   statistics: AttendanceStats;
 }
 
+type StudentForm = {
+  full_name: string;
+  cpf: string;
+  rg: string;
+  birth_date: string;
+  address: string;
+  email: string;
+  phone: string;
+  due_day: string;
+  responsible: null | {
+    full_name: string;
+    cpf: string;
+    rg: string;
+    birth_date: string;
+    address: string;
+    email: string;
+    phone: string;
+  };
+};
+
+function detailsToForm(details: StudentDetails): StudentForm {
+  return {
+    full_name: details.full_name || '',
+    cpf: details.cpf || '',
+    rg: details.rg || '',
+    birth_date: details.birth_date ? String(details.birth_date).slice(0, 10) : '',
+    address: details.address || '',
+    email: details.email || '',
+    phone: details.phone || '',
+    due_day: details.due_day ? String(details.due_day) : '',
+    responsible: details.responsible
+      ? {
+          full_name: details.responsible.full_name || '',
+          cpf: details.responsible.cpf || '',
+          rg: details.responsible.rg || '',
+          birth_date: details.responsible.birth_date ? String(details.responsible.birth_date).slice(0, 10) : '',
+          address: details.responsible.address || '',
+          email: details.responsible.email || '',
+          phone: details.responsible.phone || ''
+        }
+      : null
+  };
+}
+
 export default function AdminStudents() {
   const { authFetch } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
@@ -75,6 +125,9 @@ export default function AdminStudents() {
   const [studentAssignments, setStudentAssignments] = useState<Assignment[]>([]);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'info' | 'classes' | 'attendance' | 'assignments'>('info');
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formData, setFormData] = useState<StudentForm | null>(null);
 
   useEffect(() => {
     fetchStudents();
@@ -90,9 +143,7 @@ export default function AdminStudents() {
       });
 
       const response = await authFetch(`/admin/students?${params}`);
-
       if (!response.ok) throw new Error('Erro ao buscar alunos');
-
       const data = await response.json();
       setStudents(data.data);
       setTotal(data.total);
@@ -107,31 +158,56 @@ export default function AdminStudents() {
     try {
       setDetailsLoading(true);
 
-      // Buscar detalhes básicos
       const detailsRes = await authFetch(`/admin/students/${studentId}`);
       const details = await detailsRes.json();
       setSelectedStudent(details);
+      setFormData(detailsToForm(details));
 
-      // Buscar turmas
       const classesRes = await authFetch(`/admin/students/${studentId}/classes`);
-      const classes = await classesRes.json();
-      setStudentClasses(classes);
+      setStudentClasses(await classesRes.json());
 
-      // Buscar frequência
       const attendanceRes = await authFetch(`/admin/students/${studentId}/attendance`);
-      const attendance = await attendanceRes.json();
-      setStudentAttendance(attendance);
+      setStudentAttendance(await attendanceRes.json());
 
-      // Buscar atividades
       const assignmentsRes = await authFetch(`/admin/students/${studentId}/assignments`);
-      const assignments = await assignmentsRes.json();
-      setStudentAssignments(assignments);
+      setStudentAssignments(await assignmentsRes.json());
 
       setActiveTab('info');
+      setIsEditing(false);
     } catch (error) {
       console.error('Erro ao buscar detalhes:', error);
     } finally {
       setDetailsLoading(false);
+    }
+  };
+
+  const saveStudentDetails = async () => {
+    if (!selectedStudent || !formData) return;
+    try {
+      setSaving(true);
+      const payload = {
+        ...formData,
+        due_day: formData.due_day === '' ? undefined : Number(formData.due_day),
+      };
+
+      const response = await authFetch(`/admin/students/${selectedStudent.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err?.message || 'Erro ao atualizar aluno');
+      }
+
+      await fetchStudentDetails(selectedStudent.id);
+      await fetchStudents();
+      setIsEditing(false);
+    } catch (error) {
+      console.error(error);
+      alert(error instanceof Error ? error.message : 'Erro ao atualizar aluno');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -140,13 +216,14 @@ export default function AdminStudents() {
     setStudentClasses([]);
     setStudentAttendance(null);
     setStudentAssignments([]);
+    setIsEditing(false);
+    setFormData(null);
   };
 
   const totalPages = Math.ceil(total / limit);
 
   return (
     <div className="p-6">
-      {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Gerenciar Alunos</h1>
         <p className="text-gray-600 dark:text-gray-400 mt-2">
@@ -154,7 +231,6 @@ export default function AdminStudents() {
         </p>
       </div>
 
-      {/* Busca */}
       <div className="mb-6 relative">
         <LuSearch className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
         <input
@@ -169,54 +245,33 @@ export default function AdminStudents() {
         />
       </div>
 
-      {/* Tabela */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
         {loading ? (
           <div className="p-6 text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500 mx-auto"></div>
           </div>
         ) : students.length === 0 ? (
-          <div className="p-6 text-center text-gray-500 dark:text-gray-400">
-            Nenhum aluno encontrado
-          </div>
+          <div className="p-6 text-center text-gray-500 dark:text-gray-400">Nenhum aluno encontrado</div>
         ) : (
           <>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                      Nome
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                      Email
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                      CPF
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                      Data de Nascimento
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                      Ação
-                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Nome</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Email</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Telefone</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">CPF</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Ação</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {students.map((student) => (
                     <tr key={student.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                        {student.full_name}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
-                        {student.email}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
-                        {student.cpf}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
-                        {new Date(student.birth_date).toLocaleDateString('pt-BR')}
-                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">{student.full_name}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{student.email}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{student.phone || '-'}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{student.cpf}</td>
                       <td className="px-6 py-4 text-sm">
                         <button
                           onClick={() => fetchStudentDetails(student.id)}
@@ -231,7 +286,6 @@ export default function AdminStudents() {
               </table>
             </div>
 
-            {/* Paginação */}
             <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 Mostrando {page * limit + 1} a {Math.min((page + 1) * limit, total)} de {total}
@@ -257,24 +311,16 @@ export default function AdminStudents() {
         )}
       </div>
 
-      {/* Modal de Detalhes */}
       {selectedStudent && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            {/* Header do Modal */}
             <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {selectedStudent.full_name}
-              </h2>
-              <button
-                onClick={closeModal}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-              >
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{selectedStudent.full_name}</h2>
+              <button onClick={closeModal} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
                 <LuX className="w-6 h-6" />
               </button>
             </div>
 
-            {/* Tabs */}
             <div className="border-b border-gray-200 dark:border-gray-700 px-6">
               <div className="flex gap-4">
                 {(['info', 'classes', 'attendance', 'assignments'] as const).map((tab) => (
@@ -293,10 +339,23 @@ export default function AdminStudents() {
                     {tab === 'assignments' && 'Atividades'}
                   </button>
                 ))}
+                {activeTab === 'info' && (
+                  <button
+                    onClick={() => (isEditing ? saveStudentDetails() : setIsEditing(true))}
+                    disabled={saving}
+                    className="ml-auto py-3 px-4 font-medium text-brand-600 dark:text-brand-400"
+                  >
+                    {saving ? 'Salvando...' : isEditing ? 'Salvar' : 'Editar'}
+                  </button>
+                )}
+                {activeTab === 'info' && isEditing && (
+                  <button onClick={() => setIsEditing(false)} className="py-3 px-2 font-medium text-gray-600 dark:text-gray-400">
+                    Cancelar
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Conteúdo do Modal */}
             <div className="p-6">
               {detailsLoading ? (
                 <div className="text-center py-8">
@@ -304,184 +363,158 @@ export default function AdminStudents() {
                 </div>
               ) : (
                 <>
-                  {/* Aba: Informações */}
-                  {activeTab === 'info' && (
+                  {activeTab === 'info' && formData && (
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Email</p>
-                          <p className="text-gray-900 dark:text-white font-medium">{selectedStudent.email}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">CPF</p>
-                          <p className="text-gray-900 dark:text-white font-medium">{selectedStudent.cpf}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">RG</p>
-                          <p className="text-gray-900 dark:text-white font-medium">{selectedStudent.rg}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Data de Nascimento</p>
-                          <p className="text-gray-900 dark:text-white font-medium">
-                            {new Date(selectedStudent.birth_date).toLocaleDateString('pt-BR')}
-                          </p>
-                        </div>
+                        {(['full_name', 'email', 'phone', 'cpf', 'rg', 'birth_date', 'due_day'] as const).map((field) => (
+                          <div key={field}>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              {{
+                                full_name: 'Nome',
+                                email: 'Email',
+                                phone: 'Telefone',
+                                cpf: 'CPF',
+                                rg: 'RG',
+                                birth_date: 'Data de Nascimento',
+                                due_day: 'Dia de Vencimento'
+                              }[field]}
+                            </p>
+                            {isEditing ? (
+                              <input
+                                type={field === 'birth_date' ? 'date' : field === 'due_day' ? 'number' : 'text'}
+                                value={(formData as any)[field] || ''}
+                                onChange={(e) => setFormData((prev) => prev ? { ...prev, [field]: e.target.value } : prev)}
+                                className="w-full rounded border px-2 py-1 dark:bg-gray-700"
+                              />
+                            ) : (
+                              <p className="text-gray-900 dark:text-white font-medium">
+                                {field === 'birth_date' && formData.birth_date
+                                  ? new Date(formData.birth_date).toLocaleDateString('pt-BR')
+                                  : (formData as any)[field] || '-'}
+                              </p>
+                            )}
+                          </div>
+                        ))}
                         <div className="col-span-2">
                           <p className="text-sm text-gray-600 dark:text-gray-400">Endereço</p>
-                          <p className="text-gray-900 dark:text-white font-medium">{selectedStudent.address}</p>
+                          {isEditing ? (
+                            <input
+                              value={formData.address}
+                              onChange={(e) => setFormData((prev) => prev ? { ...prev, address: e.target.value } : prev)}
+                              className="w-full rounded border px-2 py-1 dark:bg-gray-700"
+                            />
+                          ) : (
+                            <p className="text-gray-900 dark:text-white font-medium">{formData.address || '-'}</p>
+                          )}
                         </div>
                       </div>
 
-                      {selectedStudent.responsible && (
+                      {formData.responsible && (
                         <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-                          <h3 className="font-semibold text-gray-900 dark:text-white mb-3">
-                            Responsável
-                          </h3>
-                          <div className="space-y-2">
-                            <p className="text-gray-900 dark:text-white">{selectedStudent.responsible.full_name}</p>
-                            <p className="text-gray-600 dark:text-gray-400">{selectedStudent.responsible.email}</p>
-                            <p className="text-gray-600 dark:text-gray-400">{selectedStudent.responsible.phone}</p>
+                          <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Responsável</h3>
+                          <div className="grid grid-cols-2 gap-4">
+                            {(['full_name', 'email', 'phone', 'cpf', 'rg', 'birth_date'] as const).map((field) => (
+                              <div key={field}>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                  {{
+                                    full_name: 'Nome',
+                                    email: 'Email',
+                                    phone: 'Telefone',
+                                    cpf: 'CPF',
+                                    rg: 'RG',
+                                    birth_date: 'Data de Nascimento'
+                                  }[field]}
+                                </p>
+                                {isEditing ? (
+                                  <input
+                                    type={field === 'birth_date' ? 'date' : 'text'}
+                                    value={(formData.responsible as any)[field] || ''}
+                                    onChange={(e) =>
+                                      setFormData((prev) =>
+                                        prev && prev.responsible
+                                          ? { ...prev, responsible: { ...prev.responsible, [field]: e.target.value } }
+                                          : prev
+                                      )
+                                    }
+                                    className="w-full rounded border px-2 py-1 dark:bg-gray-700"
+                                  />
+                                ) : (
+                                  <p className="text-gray-900 dark:text-white font-medium">
+                                    {field === 'birth_date' && (formData.responsible as any)[field]
+                                      ? new Date((formData.responsible as any)[field]).toLocaleDateString('pt-BR')
+                                      : (formData.responsible as any)[field] || '-'}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                            <div className="col-span-2">
+                              <p className="text-sm text-gray-600 dark:text-gray-400">Endereço</p>
+                              {isEditing ? (
+                                <input
+                                  value={formData.responsible.address}
+                                  onChange={(e) =>
+                                    setFormData((prev) =>
+                                      prev && prev.responsible
+                                        ? { ...prev, responsible: { ...prev.responsible, address: e.target.value } }
+                                        : prev
+                                    )
+                                  }
+                                  className="w-full rounded border px-2 py-1 dark:bg-gray-700"
+                                />
+                              ) : (
+                                <p className="text-gray-900 dark:text-white font-medium">{formData.responsible.address || '-'}</p>
+                              )}
+                            </div>
                           </div>
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* Aba: Turmas */}
                   {activeTab === 'classes' && (
                     <div className="space-y-3">
-                      {studentClasses.length === 0 ? (
-                        <p className="text-gray-500 dark:text-gray-400">Nenhuma turma encontrada</p>
-                      ) : (
-                        studentClasses.map((cls) => (
-                          <div
-                            key={cls.id}
-                            className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition"
-                          >
-                            <h4 className="font-semibold text-gray-900 dark:text-white">{cls.name}</h4>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                              Professor: {cls.teacher_name}
-                            </p>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                              Horário: {cls.schedule}
-                            </p>
-                          </div>
-                        ))
-                      )}
+                      {studentClasses.length === 0 ? <p className="text-gray-500 dark:text-gray-400">Nenhuma turma encontrada</p> : studentClasses.map((cls) => (
+                        <div key={cls.id} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                          <h4 className="font-semibold text-gray-900 dark:text-white">{cls.name}</h4>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Professor: {cls.teacher_name}</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Horário: {cls.schedule}</p>
+                        </div>
+                      ))}
                     </div>
                   )}
 
-                  {/* Aba: Frequência */}
                   {activeTab === 'attendance' && studentAttendance && (
                     <div className="space-y-4">
                       <div className="grid grid-cols-4 gap-4">
-                        <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Total</p>
-                          <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                            {studentAttendance.statistics.total}
-                          </p>
-                        </div>
-                        <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Presentes</p>
-                          <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                            {studentAttendance.statistics.present}
-                          </p>
-                        </div>
-                        <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg">
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Ausentes</p>
-                          <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-                            {studentAttendance.statistics.absent}
-                          </p>
-                        </div>
-                        <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Percentual</p>
-                          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                            {studentAttendance.statistics.percentage}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 max-h-64 overflow-y-auto">
-                        <table className="w-full text-sm">
-                          <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
-                            <tr>
-                              <th className="px-4 py-2 text-left text-gray-700 dark:text-gray-300">Data</th>
-                              <th className="px-4 py-2 text-left text-gray-700 dark:text-gray-300">Turma</th>
-                              <th className="px-4 py-2 text-left text-gray-700 dark:text-gray-300">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                            {studentAttendance.attendance.map((att) => (
-                              <tr key={att.id}>
-                                <td className="px-4 py-2 text-gray-900 dark:text-white">
-                                  {new Date(att.date).toLocaleDateString('pt-BR')}
-                                </td>
-                                <td className="px-4 py-2 text-gray-600 dark:text-gray-400">
-                                  {att.class_name}
-                                </td>
-                                <td className="px-4 py-2">
-                                  <span
-                                    className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                      att.present
-                                        ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400'
-                                        : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400'
-                                    }`}
-                                  >
-                                    {att.present ? 'Presente' : 'Ausente'}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                        <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg"><p className="text-sm text-gray-600 dark:text-gray-400">Total</p><p className="text-2xl font-bold text-gray-900 dark:text-white">{studentAttendance.statistics.total}</p></div>
+                        <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg"><p className="text-sm text-gray-600 dark:text-gray-400">Presentes</p><p className="text-2xl font-bold text-green-600 dark:text-green-400">{studentAttendance.statistics.present}</p></div>
+                        <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg"><p className="text-sm text-gray-600 dark:text-gray-400">Ausentes</p><p className="text-2xl font-bold text-red-600 dark:text-red-400">{studentAttendance.statistics.absent}</p></div>
+                        <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg"><p className="text-sm text-gray-600 dark:text-gray-400">Percentual</p><p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{studentAttendance.statistics.percentage}</p></div>
                       </div>
                     </div>
                   )}
 
-                  {/* Aba: Atividades */}
                   {activeTab === 'assignments' && (
                     <div className="space-y-3 max-h-64 overflow-y-auto">
-                      {studentAssignments.length === 0 ? (
-                        <p className="text-gray-500 dark:text-gray-400">Nenhuma atividade encontrada</p>
-                      ) : (
-                        studentAssignments.map((assignment) => (
-                          <div
-                            key={assignment.id}
-                            className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg"
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <h4 className="font-semibold text-gray-900 dark:text-white">
-                                  {assignment.title}
-                                </h4>
-                                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                  Turma: {assignment.class_name}
-                                </p>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">
-                                  Tipo: {assignment.type}
-                                </p>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">
-                                  Vencimento: {new Date(assignment.due_date).toLocaleDateString('pt-BR')}
-                                </p>
-                              </div>
-                              <div className="text-right">
-                                {assignment.score !== null ? (
-                                  <div>
-                                    <p className="text-2xl font-bold text-brand-600 dark:text-brand-400">
-                                      {assignment.score}
-                                    </p>
-                                    <p className="text-xs text-gray-600 dark:text-gray-400">
-                                      de {assignment.max_score}
-                                    </p>
-                                  </div>
-                                ) : (
-                                  <p className="text-gray-500 dark:text-gray-400 text-sm">Sem nota</p>
-                                )}
-                              </div>
+                      {studentAssignments.length === 0 ? <p className="text-gray-500 dark:text-gray-400">Nenhuma atividade encontrada</p> : studentAssignments.map((assignment) => (
+                        <div key={assignment.id} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-gray-900 dark:text-white">{assignment.title}</h4>
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Turma: {assignment.class_name}</p>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">Tipo: {assignment.type}</p>
+                            </div>
+                            <div className="text-right">
+                              {assignment.score !== null ? (
+                                <div>
+                                  <p className="text-2xl font-bold text-brand-600 dark:text-brand-400">{assignment.score}</p>
+                                  <p className="text-xs text-gray-600 dark:text-gray-400">de {assignment.max_score}</p>
+                                </div>
+                              ) : <p className="text-gray-500 dark:text-gray-400 text-sm">Sem nota</p>}
                             </div>
                           </div>
-                        ))
-                      )}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </>

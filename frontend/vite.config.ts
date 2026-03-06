@@ -16,7 +16,7 @@ export default defineConfig({
     }),
   ],
   server: {
-    allowedHosts: 'all',
+    allowedHosts: true,
     proxy: {
     "/admin": "http://localhost:3333",
     "/auth": "http://localhost:3333",
@@ -24,6 +24,8 @@ export default defineConfig({
     "/users": "http://localhost:3333",
     "/classes": "http://localhost:3333",
     "/assignments": "http://localhost:3333",
+    "/teacher": "http://localhost:3333",
+    "/uploads": "http://localhost:3333",
     "/attendance": "http://localhost:3333",
     "/ping": "http://localhost:3333",
     },

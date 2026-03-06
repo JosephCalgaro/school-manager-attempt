@@ -16,12 +16,12 @@ const conn = await pool.getConnection()
 try {
     await conn.beginTransaction()
 
-    const { fullName, email, password, role } = data
+    const { fullName, email, password, role, phone } = data
     const passwordHash = await bcrypt.hash(password, 10)
 
     const [result] = await conn.query(
-    'INSERT INTO users (full_name, email, password_hash, role) VALUES (?, ?, ?, ?)',
-    [fullName, email, passwordHash, role]
+    'INSERT INTO users (full_name, email, password_hash, role, phone) VALUES (?, ?, ?, ?, ?)',
+    [fullName, email, passwordHash, role, phone || null]
     )
 
     await conn.commit()
@@ -42,7 +42,7 @@ export async function getAllUsers(req, res) {
 const conn = await pool.getConnection()
 try {
     const [rows] = await conn.query(
-    'SELECT id, full_name AS name, email, role, is_active, created_at FROM users WHERE is_active = 1 ORDER BY full_name ASC'
+    'SELECT id, full_name AS name, email, phone, role, is_active, created_at FROM users WHERE is_active = 1 ORDER BY full_name ASC'
     )
     res.json(rows)
 } catch (err) {
@@ -56,7 +56,7 @@ try {
 export async function getUserById(req, res) {
 try {
     const [rows] = await pool.query(
-    'SELECT id, full_name AS name, email, role, is_active FROM users WHERE id = ? AND is_active = 1',
+    'SELECT id, full_name AS name, email, phone, role, is_active FROM users WHERE id = ? AND is_active = 1',
     [req.params.id]
     )
     if (rows.length === 0) {
@@ -80,7 +80,7 @@ if (errors.length > 0) {
 const conn = await pool.getConnection()
 try {
     await conn.beginTransaction()
-    const { fullName, email, password, role, is_active } = data
+    const { fullName, email, password, role, phone, is_active } = data
     const passwordHash = password ? await bcrypt.hash(password, 10) : undefined
 
     const fields = []
@@ -89,6 +89,7 @@ try {
     if (email) { fields.push('email = ?'); values.push(email) }
     if (passwordHash) { fields.push('password_hash = ?'); values.push(passwordHash) }
     if (role) { fields.push('role = ?'); values.push(role) }
+    if (phone !== undefined) { fields.push('phone = ?'); values.push(phone || null) }
     if (typeof is_active !== 'undefined') { fields.push('is_active = ?'); values.push(is_active) }
 
     if (fields.length === 0) {

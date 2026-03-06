@@ -57,9 +57,9 @@ export async function createStudent(req, res) {
             } else {
                 // Se não encontrou, cria um novo responsável no banco
                 const [result] = await conn.query(
-                    `INSERT INTO responsibles (full_name, cpf, rg, birth_date, address, email)
-                    VALUES (?, ?, ?, ?, ?, ?)`,
-                    [r.fullName, r.cpf.replace(/\D/g, ''), r.rg, r.birthDate, r.address, r.email]
+                    `INSERT INTO responsibles (full_name, cpf, rg, birth_date, address, email, phone)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    [r.fullName, r.cpf.replace(/\D/g, ''), r.rg, r.birthDate, r.address, r.email, r.phone || null]
                 )
                 // result.insertId = o ID que o MySQL gerou automaticamente
                 responsibleId = result.insertId
@@ -69,8 +69,8 @@ export async function createStudent(req, res) {
         // Cria o aluno no banco de dados
         // responsible_id será null (se maior de idade) ou o ID do responsável (se menor)
         const [result] = await conn.query(
-            `INSERT INTO students (full_name, cpf, rg, birth_date, address, email, due_day, responsible_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO students (full_name, cpf, rg, birth_date, address, email, phone, due_day, responsible_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 data.fullName,
                 data.cpf.replace(/\D/g, ''),
@@ -78,6 +78,7 @@ export async function createStudent(req, res) {
                 data.birthDate,
                 data.address,
                 data.email,
+                data.phone || null,
                 data.dueDay,
                 responsibleId
             ]
@@ -147,7 +148,7 @@ export async function getStudentById(req, res) {
         // Traz o aluno + TODOS os dados do responsável (diferente do getAll que só traz o nome)
         const [rows] = await pool.query(
             `SELECT s.*, r.full_name AS responsible_name, r.cpf AS responsible_cpf,
-                    r.rg AS responsible_rg, r.email AS responsible_email,
+                    r.rg AS responsible_rg, r.email AS responsible_email, r.phone AS responsible_phone,
                     r.address AS responsible_address
             FROM students s
             LEFT JOIN responsibles r ON s.responsible_id = r.id
@@ -215,16 +216,16 @@ export async function updateStudent(req, res) {
                 responsibleId = existingResp[0].id
                 // Se o responsável já existe, atualiza os dados dele também
                 await conn.query(
-                    `UPDATE responsibles SET full_name = ?, rg = ?, birth_date = ?, address = ?, email = ?
+                    `UPDATE responsibles SET full_name = ?, rg = ?, birth_date = ?, address = ?, email = ?, phone = ?
                     WHERE id = ?`,
-                    [r.fullName, r.rg, r.birthDate, r.address, r.email, responsibleId]
+                    [r.fullName, r.rg, r.birthDate, r.address, r.email, r.phone || null, responsibleId]
                 )
             } else {
                 // Se não existe, cria um novo
                 const [result] = await conn.query(
-                    `INSERT INTO responsibles (full_name, cpf, rg, birth_date, address, email)
-                    VALUES (?, ?, ?, ?, ?, ?)`,
-                    [r.fullName, r.cpf.replace(/\D/g, ''), r.rg, r.birthDate, r.address, r.email]
+                    `INSERT INTO responsibles (full_name, cpf, rg, birth_date, address, email, phone)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    [r.fullName, r.cpf.replace(/\D/g, ''), r.rg, r.birthDate, r.address, r.email, r.phone || null]
                 )
                 responsibleId = result.insertId
             }
@@ -235,7 +236,7 @@ export async function updateStudent(req, res) {
         // WHERE id = ? → só atualiza esse aluno específico
         await conn.query(
             `UPDATE students SET full_name = ?, cpf = ?, rg = ?, birth_date = ?, address = ?,
-            email = ?, due_day = ?, responsible_id = ?
+            email = ?, phone = ?, due_day = ?, responsible_id = ?
             WHERE id = ?`,
             [
                 data.fullName,
@@ -244,6 +245,7 @@ export async function updateStudent(req, res) {
                 data.birthDate,
                 data.address,
                 data.email,
+                data.phone || null,
                 data.dueDay,
                 responsibleId,
                 req.params.id

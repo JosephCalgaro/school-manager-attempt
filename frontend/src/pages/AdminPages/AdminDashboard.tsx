@@ -79,7 +79,7 @@ export default function AdminDashboard() {
           Painel Administrativo
         </h1>
         <p className="text-gray-600 dark:text-gray-400 mt-2">
-          Bem-vindo, {user?.full_name}! Aqui você pode gerenciar alunos e usuários.
+          Bem-vindo, {user?.fullName}! Aqui você pode gerenciar alunos e usuários.
         </p>
       </div>
 

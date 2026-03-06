@@ -1,11 +1,13 @@
 // Importa o framework Express (servidor HTTP)
 import express from 'express'
+import path from 'path'
 
 // Importa o CORS (permite que o frontend acesse a API)
 import cors from 'cors'
 
 // Importa o pool de conexão com o MySQL
 import pool from './database/connection.js'
+import { ensureContactColumns } from './database/migrations.js'
 
 // Importa autenticação de token JWT
 import { authenticate } from './middlewares/auth.js'
@@ -31,6 +33,9 @@ import assignmentRoutes from './routes/assignmentRoutes.js'
 // Importa rotas administrativas
 import adminRoutes from './routes/adminRoutes.js'
 
+// Importa rotas do professor
+import teacherRoutes from './routes/teacherRoutes.js'
+
 // Cria a aplicação Express
 const app = express()
 
@@ -38,7 +43,16 @@ const app = express()
 app.use(cors())
 
 // Permite que a API receba JSON no body das requisições
-app.use(express.json())
+// limite maior para suportar anexos (base64) em atividades
+app.use(express.json({ limit: '25mb' }))
+
+// Expõe arquivos de anexos das atividades
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')))
+
+// Garante colunas de contato no schema
+ensureContactColumns().catch((error) => {
+  console.error('Erro ao aplicar migrações de contato:', error)
+})
 
 // Protege e monta as rotas de alunos /students
 app.use('/students', authenticate, studentRoutes)
@@ -57,6 +71,9 @@ app.use('/responsibles', authenticate, responsiblesRoutes)
 
 // Protege e monta as rotas administrativas /admin
 app.use('/admin', authenticate, adminRoutes)
+
+// Protege e monta as rotas do professor /teacher
+app.use('/teacher', authenticate, teacherRoutes)
 
 // Monta as rotas de autenticação no caminho /auth
 app.use('/auth', authRoutes)

@@ -5,7 +5,7 @@ import { validateResponsiblePayload, validateResponsibleUpdatePayload } from '..
 export async function getAllResponsibles(req, res) {
     try {
         const [rows] = await pool.query(
-            'SELECT id, full_name AS fullName, email FROM responsibles'
+            'SELECT id, full_name AS fullName, email, phone FROM responsibles'
         );
         res.json(rows);
     } catch (err) {
@@ -29,8 +29,8 @@ export async function createResponsible(req, res) {
         await conn.beginTransaction();
 
         const [result] = await conn.query(
-            'INSERT INTO responsibles (full_name, cpf, rg, birth_date, address, email) VALUES (?, ?, ?, ?, ?, ?)',
-            [data.fullName, data.cpf.replace(/\D/g, ''), data.rg, data.birthDate, data.address, data.email] // ✅ CPF sanitizado
+            'INSERT INTO responsibles (full_name, cpf, rg, birth_date, address, email, phone) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [data.fullName, data.cpf.replace(/\D/g, ''), data.rg, data.birthDate, data.address, data.email, data.phone || null] // ✅ CPF sanitizado
         );
 
         await conn.commit(); //commit adicionado
@@ -53,7 +53,7 @@ export async function getResponsibleById(req, res) {
     const responsibleId = req.params.id;
     try {
         const [rows] = await pool.query(
-        'SELECT id, full_name AS fullName, cpf, rg, birth_date AS birthDate, address, email FROM responsibles WHERE id = ?',
+        'SELECT id, full_name AS fullName, cpf, rg, birth_date AS birthDate, address, email, phone FROM responsibles WHERE id = ?',
         [responsibleId]
         );
         if (rows.length === 0) {
@@ -80,8 +80,8 @@ export async function updateResponsible(req, res) {
         await conn.beginTransaction();
 
         const [result] = await conn.query(
-            'UPDATE responsibles SET full_name = ?, cpf = ?, rg = ?, birth_date = ?, address = ?, email = ? WHERE id = ?',
-            [data.fullName, data.cpf.replace(/\D/g, ''), data.rg, data.birthDate, data.address, data.email, req.params.id] // ✅ CPF sanitizado
+            'UPDATE responsibles SET full_name = ?, cpf = ?, rg = ?, birth_date = ?, address = ?, email = ?, phone = ? WHERE id = ?',
+            [data.fullName, data.cpf.replace(/\D/g, ''), data.rg, data.birthDate, data.address, data.email, data.phone || null, req.params.id] // ✅ CPF sanitizado
         );
 
         if (result.affectedRows === 0) {

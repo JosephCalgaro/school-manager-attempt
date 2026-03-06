@@ -1,6 +1,6 @@
-import { useState, useEffect, ReactNode } from 'react'
+import { useState, useEffect, ReactNode, useCallback } from 'react'
 import { useNavigate } from 'react-router'
-import { AuthContext, User, AuthContextData } from './AuthContext'
+import { AuthContext, User } from './AuthContext'
 
 // AuthContext, User and AuthContextData are defined in companion file
 
@@ -51,11 +51,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     navigate('/signin')
   }
 
-  const authFetch = (input: RequestInfo, init: RequestInit = {}) => {
+  const authFetch = useCallback((input: RequestInfo, init: RequestInit = {}) => {
     const headers = new Headers(init.headers || {})
     if (token) headers.set('Authorization', `Bearer ${token}`)
     return fetch(input, { ...init, headers })
-  }
+  }, [token])
 
   return (
     <AuthContext.Provider value={{ user, token, login, logout, authFetch }}>

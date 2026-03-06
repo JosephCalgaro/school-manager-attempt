@@ -22,7 +22,7 @@ export const getStats = async (req, res) => {
 export const getAllStudents = async (req, res) => {
   try {
     const { search, limit = 10, offset = 0 } = req.query;
-    let query = 'SELECT id, full_name, cpf, email, birth_date, created_at FROM students';
+    let query = 'SELECT id, full_name, cpf, email, phone, birth_date, created_at FROM students';
     let params = [];
 
     if (search) {
@@ -64,6 +64,82 @@ export const getStudentDetails = async (req, res) => {
     res.json({ ...student, responsible });
   } catch (error) {
     res.status(500).json({ message: 'Erro ao buscar detalhes do aluno' });
+  }
+};
+
+export const updateStudentDetails = async (req, res) => {
+  const { id } = req.params;
+  const {
+    full_name,
+    cpf,
+    rg,
+    birth_date,
+    address,
+    email,
+    phone,
+    due_day,
+    responsible
+  } = req.body || {};
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [students] = await conn.query('SELECT * FROM students WHERE id = ?', [id]);
+    if (students.length === 0) {
+      await conn.rollback();
+      return res.status(404).json({ message: 'Aluno não encontrado' });
+    }
+    const current = students[0];
+
+    const studentFields = [];
+    const studentValues = [];
+    if (full_name !== undefined) { studentFields.push('full_name = ?'); studentValues.push(full_name); }
+    if (cpf !== undefined) { studentFields.push('cpf = ?'); studentValues.push(String(cpf).replace(/\D/g, '')); }
+    if (rg !== undefined) { studentFields.push('rg = ?'); studentValues.push(rg); }
+    if (birth_date !== undefined) { studentFields.push('birth_date = ?'); studentValues.push(birth_date); }
+    if (address !== undefined) { studentFields.push('address = ?'); studentValues.push(address); }
+    if (email !== undefined) { studentFields.push('email = ?'); studentValues.push(email); }
+    if (phone !== undefined) { studentFields.push('phone = ?'); studentValues.push(phone || null); }
+    if (due_day !== undefined) { studentFields.push('due_day = ?'); studentValues.push(due_day); }
+
+    if (studentFields.length > 0) {
+      await conn.query(
+        `UPDATE students SET ${studentFields.join(', ')} WHERE id = ?`,
+        [...studentValues, id]
+      );
+    }
+
+    if (responsible && current.responsible_id) {
+      const responsibleFields = [];
+      const responsibleValues = [];
+      if (responsible.full_name !== undefined) { responsibleFields.push('full_name = ?'); responsibleValues.push(responsible.full_name); }
+      if (responsible.cpf !== undefined) { responsibleFields.push('cpf = ?'); responsibleValues.push(String(responsible.cpf).replace(/\D/g, '')); }
+      if (responsible.rg !== undefined) { responsibleFields.push('rg = ?'); responsibleValues.push(responsible.rg); }
+      if (responsible.birth_date !== undefined) { responsibleFields.push('birth_date = ?'); responsibleValues.push(responsible.birth_date); }
+      if (responsible.address !== undefined) { responsibleFields.push('address = ?'); responsibleValues.push(responsible.address); }
+      if (responsible.email !== undefined) { responsibleFields.push('email = ?'); responsibleValues.push(responsible.email); }
+      if (responsible.phone !== undefined) { responsibleFields.push('phone = ?'); responsibleValues.push(responsible.phone || null); }
+
+      if (responsibleFields.length > 0) {
+        await conn.query(
+          `UPDATE responsibles SET ${responsibleFields.join(', ')} WHERE id = ?`,
+          [...responsibleValues, current.responsible_id]
+        );
+      }
+    }
+
+    await conn.commit();
+    res.json({ message: 'Aluno atualizado com sucesso' });
+  } catch (error) {
+    await conn.rollback();
+    if (error?.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ message: 'CPF ou email já cadastrado' });
+    }
+    console.error('Erro ao atualizar aluno:', error);
+    res.status(500).json({ message: 'Erro ao atualizar aluno' });
+  } finally {
+    conn.release();
   }
 };
 
@@ -115,7 +191,7 @@ export const getStudentAssignments = async (req, res) => {
 export const getAllUsers = async (req, res) => {
   try {
     const { search, role, limit = 10, offset = 0 } = req.query;
-    let query = 'SELECT id, full_name, email, role, is_active, created_at FROM users';
+    let query = 'SELECT id, full_name, email, phone, role, is_active, created_at FROM users';
     let params = [];
     let conditions = [];
     if (search) { conditions.push('(full_name LIKE ? OR email LIKE ?)'); params.push(`%${search}%`, `%${search}%`); }
@@ -136,7 +212,7 @@ export const getAllUsers = async (req, res) => {
 export const getUserDetails = async (req, res) => {
   try {
     const { id } = req.params;
-    const [users] = await pool.query('SELECT id, full_name, email, role, is_active, created_at, updated_at FROM users WHERE id = ?', [id]);
+    const [users] = await pool.query('SELECT id, full_name, email, phone, role, is_active, created_at, updated_at FROM users WHERE id = ?', [id]);
     if (users.length === 0) return res.status(404).json({ message: 'Usuário não encontrado' });
     const user = users[0];
     let classes = [];

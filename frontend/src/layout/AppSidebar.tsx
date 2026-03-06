@@ -3,23 +3,14 @@ import { Link, useLocation } from "react-router";
 
 import {
   BoxCubeIcon,
-  CalenderIcon,
   ChevronDownIcon,
   GridIcon,
   HorizontaLDots,
-  ListIcon,
-  PageIcon,
-  PieChartIcon,
-  PlugInIcon,
-  TableIcon,
   UserCircleIcon,
-  ShootingStarIcon,
-  DocsIcon,
-  TaskIcon,
-  FolderIcon,
 } from "../icons";
-import { LuUsers } from "react-icons/lu";
+import { LuUsers, LuBookOpen, LuGraduationCap } from "react-icons/lu";
 import { useSidebar } from "../context/SidebarContext";
+import { useAuth } from "../hooks/useAuth";
 import SidebarWidget from "./SidebarWidget";
 
 type NavItem = {
@@ -29,105 +20,21 @@ type NavItem = {
   subItems?: { name: string; path: string; pro?: boolean; new?: boolean }[];
 };
 
-const navItems: NavItem[] = [
+// ── Itens comuns a todos os usuários ──────────────────────────────────────────
+const commonItems: NavItem[] = [
   {
     icon: <GridIcon />,
-    name: "Dashboard",
-    subItems: [{ name: "Ecommerce", path: "/", pro: false }],
-  },
-  {
-    icon: <CalenderIcon />,
-    name: "Calendário",
-    path: "/calendar",
+    name: "Início",
+    path: "/",
   },
   {
     icon: <UserCircleIcon />,
-    name: "Perfil do Usuário",
+    name: "Meu Perfil",
     path: "/profile",
-  },
-  {
-    name: "Formulários",
-    icon: <ListIcon />,
-    subItems: [{ name: "Elementos de Formulário", path: "/form-elements", pro: false }],
-  },
-  {
-    name: "Tabelas",
-    icon: <TableIcon />,
-    subItems: [{ name: "Tabelas Básicas", path: "/basic-tables", pro: false }],
-  },
-  {
-    name: "Páginas",
-    icon: <PageIcon />,
-    subItems: [
-      { name: "Página em Branco", path: "/blank", pro: false },
-      { name: "Erro 404", path: "/error-404", pro: false },
-    ],
   },
 ];
 
-// Categoria "Exemplo" - todas as páginas do template
-const exemploItems: NavItem[] = [
-  {
-    icon: <PieChartIcon />,
-    name: "Gráficos",
-    subItems: [
-      { name: "Gráfico de Linha", path: "/line-chart", pro: false },
-      { name: "Gráfico de Barras", path: "/bar-chart", pro: false },
-    ],
-  },
-  {
-    icon: <BoxCubeIcon />,
-    name: "Elementos UI",
-    subItems: [
-      { name: "Alertas", path: "/alerts", pro: false },
-      { name: "Avatar", path: "/avatars", pro: false },
-      { name: "Badge", path: "/badge", pro: false },
-      { name: "Botões", path: "/buttons", pro: false },
-      { name: "Imagens", path: "/images", pro: false },
-      { name: "Vídeos", path: "/videos", pro: false },
-    ],
-  },
-  {
-    icon: <PlugInIcon />,
-    name: "Autenticação",
-    subItems: [
-      { name: "Sign In", path: "/signin", pro: false },
-    ],
-  },
-  {
-    icon: <DocsIcon />,
-    name: "Formulários",
-    subItems: [
-      { name: "Elementos de Formulário", path: "/form-elements", pro: false },
-    ],
-  },
-  {
-    icon: <TableIcon />,
-    name: "Tabelas",
-    subItems: [
-      { name: "Tabelas Básicas", path: "/basic-tables", pro: false },
-    ],
-  },
-  {
-    icon: <CalenderIcon />,
-    name: "Calendário",
-    path: "/calendar",
-  },
-  {
-    icon: <UserCircleIcon />,
-    name: "Perfil",
-    path: "/profile",
-  },
-  {
-    icon: <PageIcon />,
-    name: "Páginas",
-    subItems: [
-      { name: "Página em Branco", path: "/blank", pro: false },
-    ],
-  },
-];
-
-// Categoria "Admin"
+// ── Itens exclusivos do Admin ─────────────────────────────────────────────────
 const adminItems: NavItem[] = [
   {
     icon: <BoxCubeIcon />,
@@ -135,7 +42,7 @@ const adminItems: NavItem[] = [
     path: "/admin",
   },
   {
-    icon: <UserCircleIcon />,
+    icon: <LuGraduationCap />,
     name: "Gerenciar Alunos",
     path: "/admin/students",
   },
@@ -144,48 +51,39 @@ const adminItems: NavItem[] = [
     name: "Gerenciar Usuários",
     path: "/admin/users",
   },
+  {
+    icon: <LuBookOpen />,
+    name: "Gerenciar Turmas",
+    path: "/admin/classes",
+  },
 ];
 
-// Categoria "VIP"
-const vipItems: NavItem[] = [
+// ── Itens exclusivos do Professor ─────────────────────────────────────────────
+const teacherItems: NavItem[] = [
   {
-    icon: <ShootingStarIcon />,
-    name: "Área VIP",
-    subItems: [
-      { name: "Dashboard VIP", path: "/", pro: false, new: true },
-      { name: "Relatórios VIP", path: "/basic-tables", pro: false, new: true },
-    ],
-  },
-  {
-    icon: <TaskIcon />,
-    name: "Tarefas VIP",
-    subItems: [
-      { name: "Minhas Tarefas", path: "/blank", pro: false, new: true },
-      { name: "Calendário VIP", path: "/calendar", pro: false, new: true },
-    ],
-  },
-  {
-    icon: <FolderIcon />,
-    name: "Recursos VIP",
-    subItems: [
-      { name: "Gráficos Avançados", path: "/line-chart", pro: false, new: true },
-      { name: "Análises", path: "/bar-chart", pro: false, new: true },
-    ],
+    icon: <LuBookOpen />,
+    name: "Minhas Turmas",
+    path: "/teacher",
   },
 ];
+
+type MenuType = "common" | "admin" | "teacher";
 
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
+  const { user } = useAuth();
   const location = useLocation();
 
   const [openSubmenu, setOpenSubmenu] = useState<{
-    type: "main" | "others" | "exemplo" | "vip" | "admin";
+    type: MenuType;
     index: number;
   } | null>(null);
   const [subMenuHeight, setSubMenuHeight] = useState<Record<string, number>>(
     {}
   );
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  const role = (user?.role || "").toUpperCase();
 
   const isActive = useCallback(
     (path: string) => location.pathname === path,
@@ -194,11 +92,10 @@ const AppSidebar: React.FC = () => {
 
   useEffect(() => {
     let submenuMatched = false;
-    const menuGroups: { type: "main" | "others" | "exemplo" | "vip" | "admin"; items: NavItem[] }[] = [
-      { type: "main", items: navItems },
+    const menuGroups: { type: MenuType; items: NavItem[] }[] = [
+      { type: "common", items: commonItems },
       { type: "admin", items: adminItems },
-      { type: "exemplo", items: exemploItems },
-      { type: "vip", items: vipItems },
+      { type: "teacher", items: teacherItems },
     ];
 
     menuGroups.forEach(({ type, items }) => {
@@ -231,7 +128,7 @@ const AppSidebar: React.FC = () => {
     }
   }, [openSubmenu]);
 
-  const handleSubmenuToggle = (index: number, menuType: "main" | "others" | "exemplo" | "vip" | "admin") => {
+  const handleSubmenuToggle = (index: number, menuType: MenuType) => {
     setOpenSubmenu((prevOpenSubmenu) => {
       if (
         prevOpenSubmenu &&
@@ -244,7 +141,7 @@ const AppSidebar: React.FC = () => {
     });
   };
 
-  const renderMenuItems = (items: NavItem[], menuType: "main" | "others" | "exemplo" | "vip" | "admin") => (
+  const renderMenuItems = (items: NavItem[], menuType: MenuType) => (
     <ul className="flex flex-col gap-4">
       {items.map((nav, index) => (
         <li key={nav.name}>
@@ -418,7 +315,7 @@ const AppSidebar: React.FC = () => {
       <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
         <nav className="mb-6">
           <div className="flex flex-col gap-4">
-            {/* Categoria: Menu Principal */}
+            {/* Menu comum a todos */}
             <div>
               <h2
                 className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
@@ -433,74 +330,58 @@ const AppSidebar: React.FC = () => {
                   <HorizontaLDots className="size-6" />
                 )}
               </h2>
-              {renderMenuItems(navItems, "main")}
+              {renderMenuItems(commonItems, "common")}
             </div>
 
-            {/* Categoria: Admin */}
-            <div>
-              <h2
-                className={`mb-4 text-xs uppercase flex leading-[20px] font-bold ${
-                  !isExpanded && !isHovered
-                    ? "lg:justify-center"
-                    : "justify-start"
-                }`}
-                style={{ color: "#ef4444" }}
-              >
-                {isExpanded || isHovered || isMobileOpen ? (
-                  <span className="flex items-center gap-1">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#ef4444" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z" />
-                    </svg>
-                    Admin
-                  </span>
-                ) : (
-                  <HorizontaLDots />
-                )}
-              </h2>
-              {renderMenuItems(adminItems, "admin")}
-            </div>
+            {/* Seção Admin - visível apenas para admins */}
+            {role === "ADMIN" && (
+              <div>
+                <h2
+                  className={`mb-4 text-xs uppercase flex leading-[20px] font-bold ${
+                    !isExpanded && !isHovered
+                      ? "lg:justify-center"
+                      : "justify-start"
+                  }`}
+                  style={{ color: "#ef4444" }}
+                >
+                  {isExpanded || isHovered || isMobileOpen ? (
+                    <span className="flex items-center gap-1">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="#ef4444" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z" />
+                      </svg>
+                      Administração
+                    </span>
+                  ) : (
+                    <HorizontaLDots />
+                  )}
+                </h2>
+                {renderMenuItems(adminItems, "admin")}
+              </div>
+            )}
 
-            {/* Categoria: Exemplo */}
-            <div>
-              <h2
-                className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
-                  !isExpanded && !isHovered
-                    ? "lg:justify-center"
-                    : "justify-start"
-                }`}
-              >
-                {isExpanded || isHovered || isMobileOpen ? (
-                  "Exemplo"
-                ) : (
-                  <HorizontaLDots />
-                )}
-              </h2>
-              {renderMenuItems(exemploItems, "exemplo")}
-            </div>
-
-            {/* Categoria: VIP */}
-            <div>
-              <h2
-                className={`mb-4 text-xs uppercase flex leading-[20px] font-bold ${
-                  !isExpanded && !isHovered
-                    ? "lg:justify-center"
-                    : "justify-start"
-                }`}
-                style={{ color: "#f59e0b" }}
-              >
-                {isExpanded || isHovered || isMobileOpen ? (
-                  <span className="flex items-center gap-1">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#f59e0b" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
-                    </svg>
-                    VIP
-                  </span>
-                ) : (
-                  <HorizontaLDots />
-                )}
-              </h2>
-              {renderMenuItems(vipItems, "vip")}
-            </div>
+            {/* Seção Professor - visível apenas para teachers */}
+            {role === "TEACHER" && (
+              <div>
+                <h2
+                  className={`mb-4 text-xs uppercase flex leading-[20px] font-bold ${
+                    !isExpanded && !isHovered
+                      ? "lg:justify-center"
+                      : "justify-start"
+                  }`}
+                  style={{ color: "#0d9488" }}
+                >
+                  {isExpanded || isHovered || isMobileOpen ? (
+                    <span className="flex items-center gap-1">
+                      <LuBookOpen size={14} />
+                      Professor
+                    </span>
+                  ) : (
+                    <HorizontaLDots />
+                  )}
+                </h2>
+                {renderMenuItems(teacherItems, "teacher")}
+              </div>
+            )}
           </div>
         </nav>
         {isExpanded || isHovered || isMobileOpen ? <SidebarWidget /> : null}
