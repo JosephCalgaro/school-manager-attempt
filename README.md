@@ -2,13 +2,7 @@
 
 ![GitHub repo
 size](https://img.shields.io/github/repo-size/JosephCalgaro/school-manager-attempt)
-![GitHub last
-commit](https://img.shields.io/github/last-commit/JosephCalgaro/school-manager-attempt)
-![GitHub
-issues](https://img.shields.io/github/issues/JosephCalgaro/school-manager-attempt)
-![GitHub
-stars](https://img.shields.io/github/stars/JosephCalgaro/school-manager-attempt?style=social)
-![License](https://img.shields.io/badge/license-MIT-blue)
+
 
 A **full-stack School Management System** built with **React
 (frontend)** and **Node.js + Express (backend)**.
@@ -31,7 +25,6 @@ a REST API.
 -   Environment Variables
 -   Running the Project
 -   Roadmap
--   License
 
 ------------------------------------------------------------------------
 
@@ -173,13 +166,14 @@ Headers
 
 # 👨‍🎓 Students API
 
-  Method   Endpoint        Description
-  -------- --------------- -------------------
-  GET      /students       Get all students
-  GET      /students/:id   Get student by id
-  POST     /students       Create student
-  PUT      /students/:id   Update student
-  DELETE   /students/:id   Delete student
+| Method | Endpoint        | Description       |
+| ------ | --------------- | ----------------- |
+| GET    | `/students`     | Get all students  |
+| GET    | `/students/:id` | Get student by id |
+| POST   | `/students`     | Create student    |
+| PUT    | `/students/:id` | Update student    |
+| DELETE | `/students/:id` | Delete student    |
+
 
 Example:
 
@@ -195,49 +189,51 @@ Example:
 
 # 👩‍🏫 Teachers API
 
-  Method   Endpoint        Description
-  -------- --------------- ----------------
-  GET      /teachers       Get teachers
-  GET      /teachers/:id   Get teacher
-  POST     /teachers       Create teacher
-  PUT      /teachers/:id   Update teacher
-  DELETE   /teachers/:id   Delete teacher
+| Method | Endpoint        | Description       |
+| ------ | --------------- | ----------------- |
+| GET    | `/teachers`     | Get all teachers  |
+| GET    | `/teachers/:id` | Get teacher by id |
+| POST   | `/teachers`     | Create teacher    |
+| PUT    | `/teachers/:id` | Update teacher    |
+| DELETE | `/teachers/:id` | Delete teacher    |
+
 
 ------------------------------------------------------------------------
 
 # 👥 Users API
 
-  Method   Endpoint     Description
-  -------- ------------ -------------
-  GET      /users       Get users
-  GET      /users/:id   Get user
-  POST     /users       Create user
-  PUT      /users/:id   Update user
-  DELETE   /users/:id   Delete user
+| Method | Endpoint     | Description    |
+| ------ | ------------ | -------------- |
+| GET    | `/users`     | Get all users  |
+| GET    | `/users/:id` | Get user by id |
+| POST   | `/users`     | Create user    |
+| PUT    | `/users/:id` | Update user    |
+| DELETE | `/users/:id` | Delete user    |
+
 
 ------------------------------------------------------------------------
 
 # 🏫 Classes API
 
-  Method   Endpoint       Description
-  -------- -------------- --------------
-  GET      /classes       Get classes
-  GET      /classes/:id   Get class
-  POST     /classes       Create class
-  PUT      /classes/:id   Update class
-  DELETE   /classes/:id   Delete class
+| Method | Endpoint       | Description     |
+| ------ | -------------- | --------------- |
+| GET    | `/classes`     | Get all classes |
+| GET    | `/classes/:id` | Get class by id |
+| POST   | `/classes`     | Create class    |
+| PUT    | `/classes/:id` | Update class    |
+| DELETE | `/classes/:id` | Delete class    |
 
 ------------------------------------------------------------------------
 
 # 📝 Assignments API
 
-  Method   Endpoint           Description
-  -------- ------------------ -------------------
-  GET      /assignments       Get assignments
-  GET      /assignments/:id   Get assignment
-  POST     /assignments       Create assignment
-  PUT      /assignments/:id   Update assignment
-  DELETE   /assignments/:id   Delete assignment
+| Method | Endpoint           | Description         |
+| ------ | ------------------ | ------------------- |
+| GET    | `/assignments`     | Get all assignments |
+| GET    | `/assignments/:id` | Get assignment      |
+| POST   | `/assignments`     | Create assignment   |
+| PUT    | `/assignments/:id` | Update assignment   |
+| DELETE | `/assignments/:id` | Delete assignment   |
 
 Assignments support file uploads stored in:
 
@@ -247,13 +243,14 @@ Assignments support file uploads stored in:
 
 # 👪 Responsibles (Guardians)
 
-  Method   Endpoint            Description
-  -------- ------------------- -----------------
-  GET      /responsibles       Get guardians
-  GET      /responsibles/:id   Get guardian
-  POST     /responsibles       Create guardian
-  PUT      /responsibles/:id   Update guardian
-  DELETE   /responsibles/:id   Delete guardian
+| Method | Endpoint            | Description     |
+| ------ | ------------------- | --------------- |
+| GET    | `/responsibles`     | Get guardians   |
+| GET    | `/responsibles/:id` | Get guardian    |
+| POST   | `/responsibles`     | Create guardian |
+| PUT    | `/responsibles/:id` | Update guardian |
+| DELETE | `/responsibles/:id` | Delete guardian |
+
 
 ------------------------------------------------------------------------
 
@@ -271,26 +268,27 @@ Configured in:
 
 ### assignment_files
 
-  Column          Type
-  --------------- -----------
-  id              INT
-  assignment_id   INT
-  original_name   VARCHAR
-  stored_name     VARCHAR
-  mime_type       VARCHAR
-  size_bytes      INT
-  created_at      TIMESTAMP
+| Column        | Type      |
+| ------------- | --------- |
+| id            | INT       |
+| assignment_id | INT       |
+| original_name | VARCHAR   |
+| stored_name   | VARCHAR   |
+| mime_type     | VARCHAR   |
+| size_bytes    | INT       |
+| created_at    | TIMESTAMP |
 
 ### assignment_completions
 
-  Column          Type
-  --------------- -----------
-  id              INT
-  assignment_id   INT
-  student_id      INT
-  completed       BOOLEAN
-  created_at      TIMESTAMP
-  updated_at      TIMESTAMP
+| Column        | Type      |
+| ------------- | --------- |
+| id            | INT       |
+| assignment_id | INT       |
+| student_id    | INT       |
+| completed     | BOOLEAN   |
+| created_at    | TIMESTAMP |
+| updated_at    | TIMESTAMP |
+
 
 Unique constraint:
 
@@ -355,4 +353,4 @@ Create `.env` inside `backend`:
 
 # 📄 License
 
-MIT License
+This is a personal project
