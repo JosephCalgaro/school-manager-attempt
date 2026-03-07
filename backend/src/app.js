@@ -33,6 +33,9 @@ import assignmentRoutes from './routes/assignmentRoutes.js'
 // Importa rotas administrativas
 import adminRoutes from './routes/adminRoutes.js'
 
+// Importa rotas da área do aluno (self-service)
+import studentSelfRoutes from './routes/studentSelfRoutes.js'
+
 // Importa rotas do professor
 import teacherRoutes from './routes/teacherRoutes.js'
 
@@ -71,6 +74,9 @@ app.use('/responsibles', authenticate, responsiblesRoutes)
 
 // Protege e monta as rotas administrativas /admin
 app.use('/admin', authenticate, adminRoutes)
+
+// Monta as rotas da área do aluno /student
+app.use('/student', studentSelfRoutes)
 
 // Protege e monta as rotas do professor /teacher
 app.use('/teacher', authenticate, teacherRoutes)

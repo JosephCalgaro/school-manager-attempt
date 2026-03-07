@@ -75,6 +75,7 @@ type StudentForm = {
   email: string;
   phone: string;
   due_day: string;
+  password?: string;
   responsible: null | {
     full_name: string;
     cpf: string;
@@ -96,6 +97,7 @@ function detailsToForm(details: StudentDetails): StudentForm {
     email: details.email || '',
     phone: details.phone || '',
     due_day: details.due_day ? String(details.due_day) : '',
+    password: '',
     responsible: details.responsible
       ? {
           full_name: details.responsible.full_name || '',
@@ -395,6 +397,20 @@ export default function AdminStudents() {
                             )}
                           </div>
                         ))}
+                        {isEditing && (
+                          <div className="col-span-2">
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              Nova Senha <span className="text-xs text-gray-400">(deixe em branco para não alterar)</span>
+                            </p>
+                            <input
+                              type="password"
+                              placeholder="Nova senha do aluno..."
+                              value={formData.password || ''}
+                              onChange={(e) => setFormData((prev) => prev ? { ...prev, password: e.target.value } : prev)}
+                              className="w-full rounded border px-2 py-1 dark:bg-gray-700"
+                            />
+                          </div>
+                        )}
                         <div className="col-span-2">
                           <p className="text-sm text-gray-600 dark:text-gray-400">Endereço</p>
                           {isEditing ? (

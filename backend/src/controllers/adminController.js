@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs';
 import pool from '../database/connection.js';
 
 // ============ CONTADORES ============
@@ -56,6 +57,7 @@ export const getStudentDetails = async (req, res) => {
     const [students] = await pool.query('SELECT * FROM students WHERE id = ?', [id]);
     if (students.length === 0) return res.status(404).json({ message: 'Aluno não encontrado' });
     const student = students[0];
+    delete student.password_hash; // nunca expor o hash
     let responsible = null;
     if (student.responsible_id) {
       const [responsibles] = await pool.query('SELECT * FROM responsibles WHERE id = ?', [student.responsible_id]);
@@ -78,6 +80,7 @@ export const updateStudentDetails = async (req, res) => {
     email,
     phone,
     due_day,
+    password,
     responsible
   } = req.body || {};
 
@@ -102,6 +105,14 @@ export const updateStudentDetails = async (req, res) => {
     if (email !== undefined) { studentFields.push('email = ?'); studentValues.push(email); }
     if (phone !== undefined) { studentFields.push('phone = ?'); studentValues.push(phone || null); }
     if (due_day !== undefined) { studentFields.push('due_day = ?'); studentValues.push(due_day); }
+
+    // Atualiza senha apenas se uma nova for enviada
+    // (o hash é calculado de forma assíncrona com bcrypt)
+    if (password) {
+      const hash = await bcrypt.hash(password, 10);
+      studentFields.push('password_hash = ?');
+      studentValues.push(hash);
+    }
 
     if (studentFields.length > 0) {
       await conn.query(
@@ -178,7 +189,7 @@ export const getStudentAssignments = async (req, res) => {
   try {
     const { id } = req.params;
     const [assignments] = await pool.query(
-      `SELECT a.id, a.title, a.type, a.max_score, a.due_date, a.description, c.name as class_name, g.score FROM assignments a INNER JOIN classes c ON a.class_id = c.id INNER JOIN class_students cs ON c.id = cs.class_id LEFT JOIN grades g ON a.id = g.assignment_id AND g.student_id = ? WHERE cs.student_id = ? ORDER BY a.due_date DESC`,
+      `SELECT a.id, a.title, a.type, a.max_score, a.due_date, a.description, c.name as class_name, g.score FROM assignments a INNER JOIN classes c ON a.class_id = c.id INNER JOIN class_students cs ON c.id = cs.class_id LEFT JOIN grades g ON a.id = g.assignments_id AND g.student_id = ? WHERE cs.student_id = ? ORDER BY a.due_date DESC`,
       [id, id]
     );
     res.json(assignments);

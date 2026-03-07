@@ -7,6 +7,7 @@ export default function AdminClasses() {
       detailBasePath="/admin/classes"
       allowedRoles={['ADMIN']}
       title="Turmas da Escola"
+      isAdmin={true}
     />
   )
 }

@@ -6,6 +6,7 @@ import pool from '../database/connection.js'
 // isMinor → verifica se o aluno é menor de idade pela data de nascimento
 import { validateStudentPayload } from '../utils/validator.js'
 import { isMinor } from '../utils/validator.js'
+import bcrypt from 'bcryptjs'
 
 // ==============================
 // CRIAR ALUNO (POST /students)
@@ -67,20 +68,27 @@ export async function createStudent(req, res) {
         }
 
         // Cria o aluno no banco de dados
+        // Cria o aluno no banco de dados
         // responsible_id será null (se maior de idade) ou o ID do responsável (se menor)
+        // password_hash: se enviado, faz o hash; caso contrário deixa NULL
+        const passwordHash = data.password
+            ? await bcrypt.hash(data.password, 10)
+            : null
+
         const [result] = await conn.query(
-            `INSERT INTO students (full_name, cpf, rg, birth_date, address, email, phone, due_day, responsible_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO students (full_name, cpf, rg, birth_date, address, email, phone, due_day, responsible_id, password_hash)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 data.fullName,
-                data.cpf.replace(/\D/g, ''),
+                data.cpf.replace(/\D/g, ""),
                 data.rg,
                 data.birthDate,
                 data.address,
                 data.email,
                 data.phone || null,
                 data.dueDay,
-                responsibleId
+                responsibleId,
+                passwordHash
             ]
         )
 
@@ -129,8 +137,8 @@ export async function getAllStudents(req, res) {
             ORDER BY s.full_name`
         )
 
-        // Retorna o array de alunos como JSON (status 200 OK é o padrão)
-        res.json(rows)
+        // Remove password_hash antes de retornar
+        res.json(rows.map(({ password_hash, ...s }) => s))
     } catch (error) {
         console.error(error)
         res.status(500).json({ error: 'Erro ao buscar alunos' })
@@ -163,7 +171,7 @@ export async function getStudentById(req, res) {
         }
 
         // rows[0] = primeiro (e único) resultado, já que ID é único
-        res.json(rows[0])
+        const { password_hash, ...safeStudent } = rows[0]; res.json(safeStudent)
     } catch (error) {
         console.error(error)
         res.status(500).json({ error: 'Erro ao buscar aluno' })
@@ -232,25 +240,31 @@ export async function updateStudent(req, res) {
         }
 
         // UPDATE = atualiza os dados no banco
-        // SET campo = valor → define os novos valores
-        // WHERE id = ? → só atualiza esse aluno específico
-        await conn.query(
-            `UPDATE students SET full_name = ?, cpf = ?, rg = ?, birth_date = ?, address = ?,
-            email = ?, phone = ?, due_day = ?, responsible_id = ?
-            WHERE id = ?`,
-            [
-                data.fullName,
-                data.cpf.replace(/\D/g, ''),
-                data.rg,
-                data.birthDate,
-                data.address,
-                data.email,
-                data.phone || null,
-                data.dueDay,
-                responsibleId,
-                req.params.id
-            ]
-        )
+        // password_hash: atualiza somente se uma nova senha for enviada
+        let updateQuery = `UPDATE students SET full_name = ?, cpf = ?, rg = ?, birth_date = ?, address = ?,
+            email = ?, phone = ?, due_day = ?, responsible_id = ?`
+        const updateParams = [
+            data.fullName,
+            data.cpf.replace(/\D/g, ""),
+            data.rg,
+            data.birthDate,
+            data.address,
+            data.email,
+            data.phone || null,
+            data.dueDay,
+            responsibleId
+        ]
+
+        if (data.password) {
+            const newHash = await bcrypt.hash(data.password, 10)
+            updateQuery += `, password_hash = ?`
+            updateParams.push(newHash)
+        }
+
+        updateQuery += ` WHERE id = ?`
+        updateParams.push(req.params.id)
+
+        await conn.query(updateQuery, updateParams)
 
         await conn.commit()
         res.json({ message: 'Aluno atualizado com sucesso' })
