@@ -7,7 +7,8 @@ import PageMeta from '../../components/common/PageMeta'
 type Stats = {
   totalStudents: number
   totalClasses: number
-  upcomingAssignments: number
+  totalUsers?: number
+  upcomingAssignments?: number
 }
 
 type RecentClass = {
@@ -101,7 +102,10 @@ export default function Home() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <StatCard icon={<LuGraduationCap className="h-8 w-8" />} label="Alunos" value={stats?.totalStudents ?? 0} color="border-l-brand-500" />
             <StatCard icon={<LuBookOpen className="h-8 w-8" />} label="Turmas" value={stats?.totalClasses ?? 0} color="border-l-teal-500" />
-            <StatCard icon={<LuClipboardList className="h-8 w-8" />} label="Atividades Próximas" value={stats?.upcomingAssignments ?? 0} sub="nos próximos dias" color="border-l-orange-500" />
+            {isAdmin
+              ? <StatCard icon={<LuUsers className="h-8 w-8" />} label="Usuários" value={stats?.totalUsers ?? 0} color="border-l-purple-500" />
+              : <StatCard icon={<LuClipboardList className="h-8 w-8" />} label="Atividades Próximas" value={stats?.upcomingAssignments ?? 0} sub="nos próximos dias" color="border-l-orange-500" />
+            }
           </div>
         )}
 
@@ -173,7 +177,7 @@ export default function Home() {
           </h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
-              { label: isAdmin ? 'Gerenciar Alunos' : 'Minhas Turmas', icon: <LuUsers className="h-5 w-5" />, path: isAdmin ? '/admin/students' : '/teacher' },
+            { label: isAdmin ? 'Gerenciar Alunos' : 'Meus Alunos', icon: <LuUsers className="h-5 w-5" />, path: isAdmin ? '/admin/students' : '/teacher/students' },
               { label: 'Turmas', icon: <LuBookOpen className="h-5 w-5" />, path: isAdmin ? '/admin/classes' : '/teacher' },
               { label: 'Calendário', icon: <LuCalendarDays className="h-5 w-5" />, path: '/calendar' },
               ...(isAdmin ? [{ label: 'Usuários', icon: <LuGraduationCap className="h-5 w-5" />, path: '/admin/users' }] : []),

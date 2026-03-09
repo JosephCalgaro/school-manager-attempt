@@ -38,6 +38,8 @@ import studentSelfRoutes from './routes/studentSelfRoutes.js'
 
 // Importa rotas do professor
 import teacherRoutes from './routes/teacherRoutes.js'
+import secretaryRoutes from './routes/secretaryRoutes.js'
+import responsibleSelfRoutes from './routes/resposibleSelfRoutes.js'
 
 // Cria a aplicação Express
 const app = express()
@@ -80,6 +82,8 @@ app.use('/student', studentSelfRoutes)
 
 // Protege e monta as rotas do professor /teacher
 app.use('/teacher', authenticate, teacherRoutes)
+app.use('/secretary', authenticate, secretaryRoutes)
+app.use('/responsible', responsibleSelfRoutes)
 
 // Monta as rotas de autenticação no caminho /auth
 app.use('/auth', authRoutes)

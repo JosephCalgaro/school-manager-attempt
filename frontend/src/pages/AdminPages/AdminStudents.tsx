@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { LuSearch, LuX } from 'react-icons/lu';
+import { LuSearch, LuX, LuPlus, LuUserPlus } from 'react-icons/lu';
 
 interface Student {
   id: number;
@@ -130,12 +130,9 @@ export default function AdminStudents() {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState<StudentForm | null>(null);
+  const [createModal, setCreateModal] = useState(false);
 
-  useEffect(() => {
-    fetchStudents();
-  }, [search, page]);
-
-  const fetchStudents = async () => {
+  const fetchStudents = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams({
@@ -154,7 +151,11 @@ export default function AdminStudents() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [search, page, limit, authFetch]);
+
+  useEffect(() => {
+    fetchStudents();
+  }, [fetchStudents]);
 
   const fetchStudentDetails = async (studentId: number) => {
     try {
@@ -226,11 +227,17 @@ export default function AdminStudents() {
 
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Gerenciar Alunos</h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">
-          Total de alunos: <span className="font-semibold">{total}</span>
-        </p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Gerenciar Alunos</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            Total de alunos: <span className="font-semibold">{total}</span>
+          </p>
+        </div>
+        <button onClick={() => setCreateModal(true)}
+          className="flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600">
+          <LuPlus className="h-4 w-4" /> Novo Aluno
+        </button>
       </div>
 
       <div className="mb-6 relative">
@@ -384,7 +391,7 @@ export default function AdminStudents() {
                             {isEditing ? (
                               <input
                                 type={field === 'birth_date' ? 'date' : field === 'due_day' ? 'number' : 'text'}
-                                value={(formData as any)[field] || ''}
+                                value={formData[field] ?? ''}
                                 onChange={(e) => setFormData((prev) => prev ? { ...prev, [field]: e.target.value } : prev)}
                                 className="w-full rounded border px-2 py-1 dark:bg-gray-700"
                               />
@@ -392,7 +399,7 @@ export default function AdminStudents() {
                               <p className="text-gray-900 dark:text-white font-medium">
                                 {field === 'birth_date' && formData.birth_date
                                   ? new Date(formData.birth_date).toLocaleDateString('pt-BR')
-                                  : (formData as any)[field] || '-'}
+                                  : formData[field] || '-'}
                               </p>
                             )}
                           </div>
@@ -429,7 +436,9 @@ export default function AdminStudents() {
                         <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
                           <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Responsável</h3>
                           <div className="grid grid-cols-2 gap-4">
-                            {(['full_name', 'email', 'phone', 'cpf', 'rg', 'birth_date'] as const).map((field) => (
+                            {(() => {
+                              const resp = formData.responsible;
+                              return (['full_name', 'email', 'phone', 'cpf', 'rg', 'birth_date'] as const).map((field) => (
                               <div key={field}>
                                 <p className="text-sm text-gray-600 dark:text-gray-400">
                                   {{
@@ -444,7 +453,7 @@ export default function AdminStudents() {
                                 {isEditing ? (
                                   <input
                                     type={field === 'birth_date' ? 'date' : 'text'}
-                                    value={(formData.responsible as any)[field] || ''}
+                                    value={resp[field] ?? ''}
                                     onChange={(e) =>
                                       setFormData((prev) =>
                                         prev && prev.responsible
@@ -456,13 +465,14 @@ export default function AdminStudents() {
                                   />
                                 ) : (
                                   <p className="text-gray-900 dark:text-white font-medium">
-                                    {field === 'birth_date' && (formData.responsible as any)[field]
-                                      ? new Date((formData.responsible as any)[field]).toLocaleDateString('pt-BR')
-                                      : (formData.responsible as any)[field] || '-'}
+                                    {field === 'birth_date' && resp[field]
+                                      ? new Date(resp[field]).toLocaleDateString('pt-BR')
+                                      : resp[field] || '-'}
                                   </p>
                                 )}
                               </div>
-                            ))}
+                            ));
+                            })()}
                             <div className="col-span-2">
                               <p className="text-sm text-gray-600 dark:text-gray-400">Endereço</p>
                               {isEditing ? (
@@ -539,6 +549,137 @@ export default function AdminStudents() {
           </div>
         </div>
       )}
+
+      {createModal && (
+        <CreateStudentModal
+          onClose={() => setCreateModal(false)}
+          onSaved={() => { setCreateModal(false); fetchStudents(); }}
+          authFetch={authFetch}
+        />
+      )}
     </div>
   );
+}
+
+const emptyStudentForm = (): StudentForm => ({
+  full_name: '', cpf: '', rg: '', birth_date: '', address: '',
+  email: '', phone: '', due_day: '', password: '', responsible: null,
+})
+const emptyResp = () => ({
+  full_name: '', cpf: '', rg: '', birth_date: '', address: '', email: '', phone: '', password: '',
+})
+
+type SField = { key: keyof Omit<StudentForm,'responsible'|'password'>; label: string; type?: string }
+const S_FIELDS: SField[] = [
+  { key: 'full_name',  label: 'Nome completo *' },
+  { key: 'email',      label: 'Email *' },
+  { key: 'cpf',        label: 'CPF *' },
+  { key: 'rg',         label: 'RG' },
+  { key: 'birth_date', label: 'Data de nascimento', type: 'date' },
+  { key: 'phone',      label: 'Telefone' },
+  { key: 'address',    label: 'Endereço' },
+  { key: 'due_day',    label: 'Dia de vencimento', type: 'number' },
+]
+type RField = { key: keyof NonNullable<StudentForm['responsible']>; label: string; type?: string }
+const R_FIELDS: RField[] = [
+  { key: 'full_name',  label: 'Nome completo *' },
+  { key: 'email',      label: 'Email *' },
+  { key: 'cpf',        label: 'CPF' },
+  { key: 'rg',         label: 'RG' },
+  { key: 'birth_date', label: 'Data de nascimento', type: 'date' },
+  { key: 'phone',      label: 'Telefone' },
+  { key: 'address',    label: 'Endereço' },
+  { key: 'password',   label: 'Senha de acesso', type: 'password' },
+]
+
+function CreateStudentModal({ onClose, onSaved, authFetch }: {
+  onClose: () => void; onSaved: () => void
+  authFetch: (input: RequestInfo, init?: RequestInit) => Promise<Response>
+}) {
+  const [form, setForm] = useState<StudentForm>(emptyStudentForm())
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const setS = (k: keyof Omit<StudentForm,'responsible'>, v: string) =>
+    setForm(p => ({ ...p, [k]: v }))
+  const setR = (k: keyof NonNullable<StudentForm['responsible']>, v: string) =>
+    setForm(p => p.responsible ? { ...p, responsible: { ...p.responsible, [k]: v } } : p)
+
+  const submit = async () => {
+    setError(null)
+    if (!form.full_name || !form.email || !form.cpf) return setError('Nome, email e CPF são obrigatórios')
+    if (!form.password) return setError('Senha é obrigatória')
+    setSaving(true)
+    try {
+      const payload = { ...form, due_day: form.due_day ? Number(form.due_day) : undefined }
+      const res = await authFetch('/admin/students', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e?.message || 'Erro ao salvar') }
+      onSaved()
+    } catch (e) { setError(e instanceof Error ? e.message : 'Erro ao salvar') }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white dark:bg-gray-900 shadow-xl">
+        <div className="sticky top-0 flex items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 py-4 bg-white dark:bg-gray-900">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Novo Aluno</h2>
+          <button onClick={onClose}><LuX className="h-5 w-5 text-gray-400" /></button>
+        </div>
+        <div className="p-6 space-y-6">
+          {error && <p className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:border-red-800 dark:text-red-400">{error}</p>}
+
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Dados do Aluno</h3>
+            <div className="grid grid-cols-2 gap-3">
+              {S_FIELDS.map(f => (
+                <div key={f.key} className={f.key === 'full_name' || f.key === 'address' ? 'col-span-2' : ''}>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{f.label}</label>
+                  <input type={f.type ?? 'text'} value={form[f.key] ?? ''} onChange={e => setS(f.key as any, e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                </div>
+              ))}
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Senha *</label>
+                <input type="password" value={form.password ?? ''} onChange={e => setS('password', e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Responsável</h3>
+              {!form.responsible
+                ? <button onClick={() => setForm(p => ({ ...p, responsible: emptyResp() }))}
+                    className="flex items-center gap-1 text-xs text-brand-600 dark:text-brand-400 hover:underline">
+                    <LuUserPlus className="h-3.5 w-3.5" /> Adicionar responsável
+                  </button>
+                : <button onClick={() => setForm(p => ({ ...p, responsible: null }))}
+                    className="text-xs text-red-500 hover:underline">Remover</button>}
+            </div>
+            {form.responsible && (
+              <div className="grid grid-cols-2 gap-3 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                {R_FIELDS.map(f => (
+                  <div key={f.key} className={f.key === 'full_name' || f.key === 'address' ? 'col-span-2' : ''}>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{f.label}</label>
+                    <input type={f.type ?? 'text'} value={form.responsible![f.key] ?? ''} onChange={e => setR(f.key, e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-gray-200 dark:border-gray-700 px-6 py-4">
+          <button onClick={onClose} className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 dark:border-gray-600 dark:text-gray-300">Cancelar</button>
+          <button onClick={submit} disabled={saving} className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50">
+            {saving ? 'Salvando...' : 'Cadastrar aluno'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }

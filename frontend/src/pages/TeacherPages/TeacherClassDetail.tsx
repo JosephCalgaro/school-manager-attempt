@@ -36,6 +36,17 @@ type Student = {
   average: number | null
 }
 
+type LessonPlan = {
+  id: number
+  class_id: number
+  title: string
+  description: string | null
+  planned_date: string
+  status: 'PLANNED' | 'DONE' | 'CANCELLED'
+  completion_notes: string | null
+  created_at: string
+}
+
 type ClassDetail = {
   id: number
   name: string
@@ -46,13 +57,14 @@ type ClassDetail = {
   assignments: Assignment[]
 }
 
-type TabKey = 'students' | 'attendance' | 'assignments' | 'grades'
+type TabKey = 'students' | 'attendance' | 'assignments' | 'grades' | 'lesson-plans'
 
 const TAB_ITEMS: Array<{ key: TabKey; label: string }> = [
-  { key: 'students', label: 'Alunos' },
-  { key: 'attendance', label: 'Presença' },
-  { key: 'assignments', label: 'Atividades' },
-  { key: 'grades', label: 'Notas' }
+  { key: 'students',     label: 'Alunos' },
+  { key: 'attendance',   label: 'Presença' },
+  { key: 'assignments',  label: 'Atividades' },
+  { key: 'grades',       label: 'Notas' },
+  { key: 'lesson-plans', label: 'Planejamento' },
 ]
 
 type UploadPayload = {
@@ -125,6 +137,17 @@ export default function TeacherClassDetail({ apiBase = '/teacher' }: TeacherClas
   const [noteDrafts, setNoteDrafts] = useState<Record<number, { note1: string; note2: string; note3: string }>>({})
   const [savingNotes, setSavingNotes] = useState(false)
 
+  // ── Lesson plans ─────────────────────────────────────────────────────────────
+  const [lessonPlans, setLessonPlans] = useState<LessonPlan[]>([])
+  const [templates, setTemplates] = useState<{ id: number; title: string; description: string | null }[]>([])
+  const [loadingPlans, setLoadingPlans] = useState(false)
+  const [linkTemplateId, setLinkTemplateId] = useState<string>('')
+  const [linkDate, setLinkDate] = useState(new Date().toISOString().slice(0, 10))
+  const [savingLink, setSavingLink] = useState(false)
+  const [doneModal, setDoneModal] = useState<LessonPlan | null>(null)
+  const [doneNotes, setDoneNotes] = useState('')
+  const [savingDone, setSavingDone] = useState(false)
+
   const loadClassDetail = async () => {
     if (!Number.isInteger(classId)) {
       setError('Turma inválida')
@@ -177,6 +200,25 @@ export default function TeacherClassDetail({ apiBase = '/teacher' }: TeacherClas
     loadClassDetail()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classId])
+
+  const loadLessonPlans = async () => {
+    if (!Number.isInteger(classId)) return
+    try {
+      setLoadingPlans(true)
+      const [plansRes, templatesRes] = await Promise.all([
+        authFetch(`${apiBase}/classes/${classId}/lesson-plans`),
+        authFetch(`${apiBase}/lesson-plans`),
+      ])
+      if (plansRes.ok)     setLessonPlans(await plansRes.json())
+      if (templatesRes.ok) setTemplates(await templatesRes.json())
+    } catch { /* silent */ }
+    finally { setLoadingPlans(false) }
+  }
+
+  useEffect(() => {
+    if (tab === 'lesson-plans') loadLessonPlans()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, classId])
 
   const studentList = useMemo(() => data?.students ?? [], [data])
   const assignmentList = useMemo(() => data?.assignments ?? [], [data])
@@ -377,6 +419,64 @@ export default function TeacherClassDetail({ apiBase = '/teacher' }: TeacherClas
   }
 
   if (loading) return <div className="flex min-h-[60vh] items-center justify-center"><p className="text-sm text-gray-600 dark:text-gray-400">Carregando turma...</p></div>
+
+  const handleLinkPlan = async () => {
+    if (!linkTemplateId) return setError('Selecione um plano de aula')
+    setSavingLink(true); setMessage(null); setError(null)
+    try {
+      const res = await authFetch(`${apiBase}/classes/${classId}/lesson-plans`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ template_id: Number(linkTemplateId), planned_date: linkDate }),
+      })
+      if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error(b?.error || 'Erro ao vincular') }
+      setLinkTemplateId(''); setLinkDate(new Date().toISOString().slice(0, 10))
+      setMessage('Plano vinculado à turma.')
+      await loadLessonPlans()
+    } catch (e) { setError(e instanceof Error ? e.message : 'Erro') }
+    finally { setSavingLink(false) }
+  }
+
+  const handleMarkDone = async () => {
+    if (!doneModal) return
+    setSavingDone(true); setMessage(null); setError(null)
+    try {
+      const res = await authFetch(`${apiBase}/classes/${classId}/lesson-plans/${doneModal.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'DONE', completion_notes: doneNotes || null }),
+      })
+      if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error(b?.error || 'Erro') }
+      setDoneModal(null); setDoneNotes('')
+      setMessage('Aula marcada como concluída.')
+      await loadLessonPlans()
+    } catch (e) { setError(e instanceof Error ? e.message : 'Erro') }
+    finally { setSavingDone(false) }
+  }
+
+  const handleRevertPlan = async (plan: LessonPlan) => {
+    try {
+      const res = await authFetch(`${apiBase}/classes/${classId}/lesson-plans/${plan.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'PLANNED', completion_notes: null }),
+      })
+      if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error(b?.error || 'Erro') }
+      setMessage('Plano reaberto.')
+      await loadLessonPlans()
+    } catch (e) { setError(e instanceof Error ? e.message : 'Erro') }
+  }
+
+  const handleUnlinkPlan = async (planId: number) => {
+    if (!window.confirm('Desvincular este plano da turma?')) return
+    try {
+      const res = await authFetch(`${apiBase}/classes/${classId}/lesson-plans/${planId}`, { method: 'DELETE' })
+      if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error(b?.error || 'Erro') }
+      setMessage('Plano desvinculado.')
+      await loadLessonPlans()
+    } catch (e) { setError(e instanceof Error ? e.message : 'Erro') }
+  }
+
   if (error && !data) return <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">{error}</div>
   if (!data) return null
 
@@ -607,6 +707,149 @@ export default function TeacherClassDetail({ apiBase = '/teacher' }: TeacherClas
           </button>
         </div>
       )}
+
+      {tab === 'lesson-plans' && (() => {
+        const done  = lessonPlans.filter(p => p.status === 'DONE').length
+        const total = lessonPlans.length
+        const pct   = total > 0 ? Math.round((done / total) * 100) : 0
+        const fmtDate = (d: string) =>
+          new Date(d.slice(0, 10) + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+        const statusColor = (s: LessonPlan['status']) =>
+          s === 'DONE'      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+          s === 'CANCELLED' ? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400' :
+                              'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+        const statusLabel = (s: LessonPlan['status']) =>
+          s === 'DONE' ? 'Concluída' : s === 'CANCELLED' ? 'Cancelada' : 'Planejada'
+
+        return (
+          <div className="space-y-6">
+            {/* Barra de progresso */}
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-base font-semibold text-gray-900 dark:text-white">Progresso do Planejamento</h2>
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{done}/{total} aulas concluídas</span>
+              </div>
+              <div className="h-3 w-full rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                <div className="h-3 rounded-full bg-brand-500 transition-all duration-500" style={{ width: `${pct}%` }} />
+              </div>
+              <p className="mt-1 text-right text-xs text-gray-500 dark:text-gray-400">{pct}% concluído</p>
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-2">
+              {/* Lista de planos vinculados */}
+              <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 space-y-3">
+                <h2 className="text-base font-semibold text-gray-900 dark:text-white">Aulas desta Turma</h2>
+                {loadingPlans ? (
+                  <div className="flex justify-center py-6"><div className="h-6 w-6 animate-spin rounded-full border-b-2 border-brand-500" /></div>
+                ) : lessonPlans.length === 0 ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Nenhum plano vinculado ainda. Use o painel ao lado para vincular.</p>
+                ) : lessonPlans.map(plan => (
+                  <div key={plan.id} className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-medium text-gray-900 dark:text-white">{plan.title}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{fmtDate(plan.planned_date)}</p>
+                      </div>
+                      <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColor(plan.status)}`}>{statusLabel(plan.status)}</span>
+                    </div>
+                    {plan.description && <p className="text-sm text-gray-600 dark:text-gray-400">{plan.description}</p>}
+                    {plan.completion_notes && (
+                      <div className="rounded-lg bg-green-50 dark:bg-green-950/30 px-3 py-2 text-xs text-green-700 dark:text-green-400">
+                        <span className="font-medium">O que foi feito: </span>{plan.completion_notes}
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {plan.status === 'PLANNED' && (
+                        <button onClick={() => { setDoneModal(plan); setDoneNotes('') }}
+                          className="rounded-md bg-green-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-green-600">
+                          ✓ Marcar como feita
+                        </button>
+                      )}
+                      {plan.status === 'DONE' && (
+                        <button onClick={() => handleRevertPlan(plan)}
+                          className="rounded-md border border-gray-300 px-2.5 py-1 text-xs text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300">
+                          Reabrir
+                        </button>
+                      )}
+                      <button onClick={() => handleUnlinkPlan(plan.id)}
+                        className="rounded-md border border-red-300 px-2.5 py-1 text-xs text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400">
+                        Desvincular
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Vincular plano da biblioteca */}
+              <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 space-y-4">
+                <div>
+                  <h2 className="text-base font-semibold text-gray-900 dark:text-white">Vincular Plano</h2>
+                  <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    Selecione um plano da sua biblioteca e defina a data desta aula nesta turma.
+                  </p>
+                </div>
+                {templates.length === 0 ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Você ainda não tem planos criados.{' '}
+                    <a href="/teacher/lesson-plans" className="text-brand-600 underline dark:text-brand-400">Criar planos de aula →</a>
+                  </p>
+                ) : (
+                  <>
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Plano de aula *</label>
+                      <select value={linkTemplateId} onChange={e => setLinkTemplateId(e.target.value)}
+                        className={`mt-1 ${inputBlueClass}`}>
+                        <option value="">Selecione um plano...</option>
+                        {templates.map(t => (
+                          <option key={t.id} value={t.id}>{t.title}</option>
+                        ))}
+                      </select>
+                      {linkTemplateId && (
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                          {templates.find(t => t.id === Number(linkTemplateId))?.description}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Data da aula *</label>
+                      <input type="date" value={linkDate} onChange={e => setLinkDate(e.target.value)}
+                        className={`mt-1 ${inputBlueClass}`} />
+                    </div>
+                    <button onClick={handleLinkPlan} disabled={savingLink}
+                      className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-60">
+                      {savingLink ? 'Vinculando...' : 'Vincular à turma'}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Modal — marcar aula como concluída */}
+      {doneModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-gray-900 shadow-xl p-6 space-y-4">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">Concluir: {doneModal.title}</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Descreva o que foi efetivamente feito em aula (opcional).</p>
+            <textarea value={doneNotes} onChange={e => setDoneNotes(e.target.value)}
+              rows={4} placeholder="Ex: Foram explicados conceitos de equações do 1º grau e exercícios práticos..."
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => { setDoneModal(null); setDoneNotes('') }}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 dark:border-gray-600 dark:text-gray-300">
+                Cancelar
+              </button>
+              <button onClick={handleMarkDone} disabled={savingDone}
+                className="rounded-lg bg-green-500 px-4 py-2 text-sm font-medium text-white hover:bg-green-600 disabled:opacity-60">
+                {savingDone ? 'Salvando...' : 'Confirmar conclusão'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
+
 }

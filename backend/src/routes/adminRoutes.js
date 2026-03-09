@@ -2,6 +2,11 @@ import express from 'express';
 const router = express.Router();
 import * as adminController from '../controllers/adminController.js';
 import {
+  getAllResponsibles, getResponsibleById,
+  createResponsible, updateResponsible, deleteResponsible,
+  getStudentsByResponsibleId,
+} from '../controllers/responsiblesController.js'
+import {
   createClassAssignment,
   deleteClassAssignment,
   getTeacherClassById,
@@ -9,7 +14,15 @@ import {
   registerClassAttendance,
   upsertAssignmentCompletions,
   upsertStudentNotes,
-  updateClassAssignment
+  updateClassAssignment,
+  getMyTemplates,
+  createTemplate,
+  updateTemplate,
+  deleteTemplate,
+  getLessonPlans,
+  createLessonPlan,
+  updateLessonPlan,
+  deleteLessonPlan,
 } from '../controllers/teacherController.js';
 import { authenticate } from '../middlewares/auth.js';
 
@@ -25,13 +38,16 @@ const isAdmin = (req, res, next) => {
 router.get('/stats', authenticate, isAdmin, adminController.getStats);
 
 // Listagem de Alunos
-router.get('/students', authenticate, isAdmin, adminController.getAllStudents);
+router.get('/students',     authenticate, isAdmin, adminController.getAllStudents);
+router.post('/students',    authenticate, isAdmin, adminController.createStudent);
 router.get('/students/:id', authenticate, isAdmin, adminController.getStudentDetails);
 router.put('/students/:id', authenticate, isAdmin, adminController.updateStudentDetails);
 
 // Listagem de Usuários
-router.get('/users', authenticate, isAdmin, adminController.getAllUsers);
+router.get('/users',     authenticate, isAdmin, adminController.getAllUsers);
 router.get('/users/:id', authenticate, isAdmin, adminController.getUserDetails);
+router.post('/users',    authenticate, isAdmin, adminController.createUser);
+router.put('/users/:id', authenticate, isAdmin, adminController.updateUser);
 
 // Turmas de um aluno
 router.get('/students/:id/classes', authenticate, isAdmin, adminController.getStudentClasses);
@@ -51,5 +67,23 @@ router.post('/classes/:id/assignments', authenticate, isAdmin, createClassAssign
 router.put('/classes/:id/assignments/:assignmentId', authenticate, isAdmin, updateClassAssignment);
 router.post('/classes/:id/assignments/:assignmentId/completions', authenticate, isAdmin, upsertAssignmentCompletions);
 router.delete('/classes/:id/assignments/:assignmentId', authenticate, isAdmin, deleteClassAssignment);
+
+// Responsáveis
+router.get('/responsibles',              authenticate, isAdmin, getAllResponsibles)
+router.get('/responsibles/:id',          authenticate, isAdmin, getResponsibleById)
+router.post('/responsibles',             authenticate, isAdmin, createResponsible)
+router.put('/responsibles/:id',          authenticate, isAdmin, updateResponsible)
+router.delete('/responsibles/:id',       authenticate, isAdmin, deleteResponsible)
+router.get('/responsibles/:id/students', authenticate, isAdmin, getStudentsByResponsibleId)
+
+// Planejamento de aula (admin)
+router.get('/lesson-plans',               authenticate, isAdmin, getMyTemplates)
+router.post('/lesson-plans',              authenticate, isAdmin, createTemplate)
+router.put('/lesson-plans/:templateId',   authenticate, isAdmin, updateTemplate)
+router.delete('/lesson-plans/:templateId',authenticate, isAdmin, deleteTemplate)
+router.get('/classes/:id/lesson-plans',            authenticate, isAdmin, getLessonPlans)
+router.post('/classes/:id/lesson-plans',           authenticate, isAdmin, createLessonPlan)
+router.put('/classes/:id/lesson-plans/:planId',    authenticate, isAdmin, updateLessonPlan)
+router.delete('/classes/:id/lesson-plans/:planId', authenticate, isAdmin, deleteLessonPlan)
 
 export default router;

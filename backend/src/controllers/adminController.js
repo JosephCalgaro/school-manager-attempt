@@ -4,15 +4,12 @@ import pool from '../database/connection.js';
 // ============ CONTADORES ============
 export const getStats = async (req, res) => {
   try {
-    const [studentsCount] = await pool.query('SELECT COUNT(*) as total FROM students');
-    const [usersCount] = await pool.query('SELECT COUNT(*) as total FROM users');
-    const [usersByRole] = await pool.query('SELECT role, COUNT(*) as count FROM users GROUP BY role');
+    const [[{ totalStudents }]] = await pool.query('SELECT COUNT(*) as totalStudents FROM students')
+    const [[{ totalUsers }]]    = await pool.query('SELECT COUNT(*) as totalUsers FROM users')
+    const [[{ totalClasses }]]  = await pool.query('SELECT COUNT(*) as totalClasses FROM classes')
+    const [usersByRole]         = await pool.query('SELECT role, COUNT(*) as count FROM users GROUP BY role')
 
-    res.json({
-      totalStudents: studentsCount[0].total,
-      totalUsers: usersCount[0].total,
-      usersByRole: usersByRole
-    });
+    res.json({ totalStudents, totalUsers, totalClasses, usersByRole })
   } catch (error) {
     console.error('Erro ao buscar estatísticas:', error);
     res.status(500).json({ message: 'Erro ao buscar estatísticas' });
@@ -198,6 +195,75 @@ export const getStudentAssignments = async (req, res) => {
   }
 };
 
+export const createStudent = async (req, res) => {
+  const {
+    full_name, cpf, rg, birth_date, address, email, phone, due_day, password, responsible
+  } = req.body || {};
+
+  if (!full_name || !cpf || !email || !password) {
+    return res.status(400).json({ message: 'Nome, CPF, email e senha são obrigatórios' });
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const password_hash = await bcrypt.hash(password, 10);
+
+    let responsible_id = null;
+    if (responsible?.full_name && responsible?.email) {
+      // Se o responsável tiver senha, gera o hash; senão fica NULL (sem acesso ao sistema)
+      const resp_hash = responsible.password
+        ? await (await import('bcryptjs')).default.hash(responsible.password, 10)
+        : null
+      const [respResult] = await conn.query(
+        `INSERT INTO responsibles (full_name, cpf, rg, birth_date, address, email, phone, password_hash)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          responsible.full_name,
+          responsible.cpf ? String(responsible.cpf).replace(/\D/g, '') : null,
+          responsible.rg || null,
+          responsible.birth_date || null,
+          responsible.address || null,
+          responsible.email,
+          responsible.phone || null,
+          resp_hash,
+        ]
+      );
+      responsible_id = respResult.insertId;
+    }
+
+    const [result] = await conn.query(
+      `INSERT INTO students (full_name, cpf, rg, birth_date, address, email, phone, due_day, password_hash, responsible_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        full_name,
+        String(cpf).replace(/\D/g, ''),
+        rg || null,
+        birth_date || null,
+        address || null,
+        email,
+        phone || null,
+        due_day || null,
+        password_hash,
+        responsible_id,
+      ]
+    );
+
+    await conn.commit();
+    res.status(201).json({ id: result.insertId, message: 'Aluno cadastrado com sucesso' });
+  } catch (error) {
+    await conn.rollback();
+    if (error?.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ message: 'CPF ou email já cadastrado' });
+    }
+    console.error('Erro ao criar aluno:', error);
+    res.status(500).json({ message: 'Erro ao criar aluno' });
+  } finally {
+    conn.release();
+  }
+};
+
 // ============ USUÁRIOS ============
 export const getAllUsers = async (req, res) => {
   try {
@@ -223,7 +289,10 @@ export const getAllUsers = async (req, res) => {
 export const getUserDetails = async (req, res) => {
   try {
     const { id } = req.params;
-    const [users] = await pool.query('SELECT id, full_name, email, phone, role, is_active, created_at, updated_at FROM users WHERE id = ?', [id]);
+    const [users] = await pool.query(
+      'SELECT id, full_name, email, phone, cpf, rg, birth_date, role, is_active, created_at, updated_at FROM users WHERE id = ?',
+      [id]
+    );
     if (users.length === 0) return res.status(404).json({ message: 'Usuário não encontrado' });
     const user = users[0];
     let classes = [];
@@ -236,3 +305,184 @@ export const getUserDetails = async (req, res) => {
     res.status(500).json({ message: 'Erro ao buscar detalhes do usuário' });
   }
 };
+export const createUser = async (req, res) => {
+  const { full_name, email, phone, cpf, rg, birth_date, role, password } = req.body || {};
+  const VALID_ROLES = ['ADMIN', 'TEACHER', 'SECRETARY'];
+
+  if (!full_name || !email || !role || !password)
+    return res.status(400).json({ message: 'Nome, email, função e senha são obrigatórios' });
+  if (!VALID_ROLES.includes(role))
+    return res.status(400).json({ message: 'Função inválida' });
+
+  try {
+    const password_hash = await bcrypt.hash(password, 10);
+    const [result] = await pool.query(
+      `INSERT INTO users (full_name, email, phone, cpf, rg, birth_date, role, password_hash, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+      [full_name, email, phone || null, cpf || null, rg || null, birth_date || null, role, password_hash]
+    );
+    res.status(201).json({ id: result.insertId, message: 'Usuário criado com sucesso' });
+  } catch (error) {
+    if (error?.code === 'ER_DUP_ENTRY')
+      return res.status(409).json({ message: 'Email ou CPF já cadastrado' });
+    console.error('Erro ao criar usuário:', error);
+    res.status(500).json({ message: 'Erro ao criar usuário' });
+  }
+};
+
+export const updateUser = async (req, res) => {
+  const { id } = req.params;
+  const { full_name, email, phone, cpf, rg, birth_date, role, password, is_active } = req.body || {};
+  const VALID_ROLES = ['ADMIN', 'TEACHER', 'SECRETARY'];
+
+  if (role && !VALID_ROLES.includes(role))
+    return res.status(400).json({ message: 'Função inválida' });
+
+  try {
+    const fields = [];
+    const values = [];
+    if (full_name  !== undefined) { fields.push('full_name = ?');  values.push(full_name); }
+    if (email      !== undefined) { fields.push('email = ?');      values.push(email); }
+    if (phone      !== undefined) { fields.push('phone = ?');      values.push(phone || null); }
+    if (cpf        !== undefined) { fields.push('cpf = ?');        values.push(cpf || null); }
+    if (rg         !== undefined) { fields.push('rg = ?');         values.push(rg || null); }
+    if (birth_date !== undefined) { fields.push('birth_date = ?'); values.push(birth_date || null); }
+    if (role       !== undefined) { fields.push('role = ?');       values.push(role); }
+    if (is_active  !== undefined) { fields.push('is_active = ?');  values.push(is_active ? 1 : 0); }
+    if (password) {
+      const hash = await bcrypt.hash(password, 10);
+      fields.push('password_hash = ?'); values.push(hash);
+    }
+    if (!fields.length) return res.status(400).json({ message: 'Nenhum campo para atualizar' });
+
+    values.push(id);
+    await pool.query(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, values);
+    res.json({ message: 'Usuário atualizado com sucesso' });
+  } catch (error) {
+    if (error?.code === 'ER_DUP_ENTRY')
+      return res.status(409).json({ message: 'Email ou CPF já cadastrado' });
+    console.error('Erro ao atualizar usuário:', error);
+    res.status(500).json({ message: 'Erro ao atualizar usuário' });
+  }
+};
+
+export const getSecretaryStats = async (req, res) => {
+  try {
+    const [[{ totalStudents }]] = await pool.query('SELECT COUNT(*) as totalStudents FROM students')
+    const [[{ newThisMonth }]] = await pool.query(
+      `SELECT COUNT(*) as newThisMonth FROM students
+       WHERE MONTH(created_at) = MONTH(CURRENT_DATE())
+         AND YEAR(created_at) = YEAR(CURRENT_DATE())`
+    )
+    const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                    'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+    const currentMonth = months[new Date().getMonth()]
+    res.json({ totalStudents, newThisMonth, currentMonth })
+  } catch (error) {
+    console.error('Erro ao buscar stats secretaria:', error)
+    res.status(500).json({ message: 'Erro ao buscar estatísticas' })
+  }
+}
+
+// ============ TURMAS (secretary / admin) ============
+export const getAllClasses = async (req, res) => {
+  try {
+    const { search } = req.query
+    let query = `
+      SELECT c.id, c.name, c.schedule,
+             u.full_name AS teacher_name,
+             COUNT(cs.student_id) AS total_students
+      FROM classes c
+      LEFT JOIN users u ON u.id = c.teacher_id
+      LEFT JOIN class_students cs ON cs.class_id = c.id
+    `
+    const params = []
+    if (search) {
+      query += ' WHERE c.name LIKE ?'
+      params.push(`%${search}%`)
+    }
+    query += ' GROUP BY c.id ORDER BY c.name'
+    const [classes] = await pool.query(query, params)
+    res.json(classes)
+  } catch (error) {
+    console.error('Erro ao listar turmas:', error)
+    res.status(500).json({ message: 'Erro ao listar turmas' })
+  }
+}
+
+export const createClass = async (req, res) => {
+  const { name, schedule, teacher_id } = req.body || {}
+  if (!name) return res.status(400).json({ message: 'Nome da turma é obrigatório' })
+  try {
+    const [result] = await pool.query(
+      'INSERT INTO classes (name, schedule, teacher_id) VALUES (?, ?, ?)',
+      [name, schedule || null, teacher_id || null]
+    )
+    res.status(201).json({ id: result.insertId, message: 'Turma criada com sucesso' })
+  } catch (error) {
+    console.error('Erro ao criar turma:', error)
+    res.status(500).json({ message: 'Erro ao criar turma' })
+  }
+}
+
+export const updateClass = async (req, res) => {
+  const { id } = req.params
+  const { name, schedule, teacher_id } = req.body || {}
+  const fields = []; const values = []
+  if (name      !== undefined) { fields.push('name = ?');       values.push(name) }
+  if (schedule  !== undefined) { fields.push('schedule = ?');   values.push(schedule || null) }
+  if (teacher_id !== undefined) { fields.push('teacher_id = ?'); values.push(teacher_id || null) }
+  if (!fields.length) return res.status(400).json({ message: 'Nenhum campo para atualizar' })
+  try {
+    await pool.query(`UPDATE classes SET ${fields.join(', ')} WHERE id = ?`, [...values, id])
+    res.json({ message: 'Turma atualizada com sucesso' })
+  } catch (error) {
+    console.error('Erro ao atualizar turma:', error)
+    res.status(500).json({ message: 'Erro ao atualizar turma' })
+  }
+}
+
+export const getClassStudentsList = async (req, res) => {
+  const { id } = req.params
+  try {
+    const [students] = await pool.query(
+      `SELECT s.id, s.full_name, s.email, s.cpf
+       FROM students s
+       JOIN class_students cs ON cs.student_id = s.id
+       WHERE cs.class_id = ?
+       ORDER BY s.full_name`,
+      [id]
+    )
+    res.json(students)
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao listar alunos da turma' })
+  }
+}
+
+export const addStudentToClass = async (req, res) => {
+  const { id } = req.params
+  const { student_id } = req.body || {}
+  if (!student_id) return res.status(400).json({ message: 'student_id é obrigatório' })
+  try {
+    await pool.query(
+      'INSERT IGNORE INTO class_students (class_id, student_id) VALUES (?, ?)',
+      [id, student_id]
+    )
+    res.json({ message: 'Aluno adicionado à turma' })
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao adicionar aluno' })
+  }
+}
+
+export const removeStudentFromClass = async (req, res) => {
+  const { id, studentId } = req.params
+  try {
+    await pool.query(
+      'DELETE FROM class_students WHERE class_id = ? AND student_id = ?',
+      [id, studentId]
+    )
+    res.json({ message: 'Aluno removido da turma' })
+  } catch (error) {
+    res.status(500).json({ message: 'Erro ao remover aluno' })
+  }
+}

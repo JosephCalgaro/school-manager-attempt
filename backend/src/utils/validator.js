@@ -228,10 +228,10 @@ export function validateAssignmentUpdatePayload(data) {
 export function validateResponsiblePayload(data){
   const errors = []
   validateRequired(errors, data.fullName, 'Nome completo do responsável é obrigatório')
-  validateRequired(errors, data.cpf, isRequired, 'CPF do responsável é obrigatório')
+  validateRequired(errors, data.cpf,      'CPF do responsável é obrigatório')
   validateWithRule(errors, data.cpf, isValidCPF, 'CPF do responsável inválido')
-  validateRequired(errors, data.rg, isRequired, 'RG do responsável é obrigatório')
-  validateRequired(errors, data.email, 'Email do responsável é obrigatório')
+  validateRequired(errors, data.rg,       'RG do responsável é obrigatório')
+  validateRequired(errors, data.email,    'Email do responsável é obrigatório')
   validateWithRule(errors, data.email, isValidEmail, 'Email do responsável inválido')
   return errors
 }

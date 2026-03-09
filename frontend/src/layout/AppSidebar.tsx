@@ -2,13 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 
 import {
-  BoxCubeIcon,
   ChevronDownIcon,
   GridIcon,
   HorizontaLDots,
   UserCircleIcon,
 } from "../icons";
-import { LuUsers, LuBookOpen, LuGraduationCap, LuCalendarDays } from "react-icons/lu";
+import { LuUsers, LuBookOpen, LuGraduationCap, LuCalendarDays, LuHouse } from "react-icons/lu";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../hooks/useAuth";
 import SidebarWidget from "./SidebarWidget";
@@ -29,18 +28,34 @@ const commonItems: NavItem[] = [
 
 // ── Itens exclusivos do Admin ─────────────────────────────────────────────────
 const adminItems: NavItem[] = [
-  { icon: <BoxCubeIcon />, name: "Painel Admin", path: "/admin" },
-  { icon: <LuGraduationCap />, name: "Gerenciar Alunos", path: "/admin/students" },
-  { icon: <LuUsers />, name: "Gerenciar Usuários", path: "/admin/users" },
-  { icon: <LuBookOpen />, name: "Gerenciar Turmas", path: "/admin/classes" },
+  { icon: <LuGraduationCap />, name: "Gerenciar Alunos",       path: "/admin/students" },
+  { icon: <LuUsers />,         name: "Gerenciar Usuários",      path: "/admin/users" },
+  { icon: <LuBookOpen />,      name: "Gerenciar Turmas",        path: "/admin/classes" },
+  { icon: <LuUsers />,         name: "Gerenciar Responsáveis",  path: "/admin/responsibles" },
+];
+
+// ── Itens exclusivos da Secretaria ────────────────────────────────────────────
+const secretaryItems: NavItem[] = [
+  { icon: <LuGraduationCap />, name: "Alunos",        path: "/secretary/students" },
+  { icon: <LuBookOpen />,      name: "Turmas",         path: "/secretary/classes" },
+  { icon: <LuUsers />,         name: "Responsáveis",   path: "/secretary/responsibles" },
 ];
 
 // ── Itens exclusivos do Professor ─────────────────────────────────────────────
 const teacherItems: NavItem[] = [
-  { icon: <LuBookOpen />, name: "Minhas Turmas", path: "/teacher" },
+  { icon: <LuBookOpen />,      name: "Minhas Turmas",    path: "/teacher" },
+  { icon: <LuUsers />,         name: "Meus Alunos",      path: "/teacher/students" },
+  { icon: <LuCalendarDays />,  name: "Planos de Aula",   path: "/teacher/lesson-plans" },
 ];
 
-type MenuType = "common" | "admin" | "teacher";
+// ── Itens do Responsável ──────────────────────────────────────────────────────
+const responsibleItems: NavItem[] = [
+  { icon: <LuHouse />,         name: "Painel",      path: "/responsible" },
+  { icon: <UserCircleIcon />,  name: "Meu Perfil",  path: "/profile" },
+  { icon: <LuCalendarDays />,  name: "Calendário",  path: "/calendar" },
+];
+
+type MenuType = "common" | "admin" | "secretary" | "teacher" | "responsible";
 
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
@@ -52,14 +67,21 @@ const AppSidebar: React.FC = () => {
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const role = (user?.role || "").toUpperCase();
-  const isActive = useCallback((path: string) => location.pathname === path, [location.pathname]);
+  const isActive = useCallback((path: string) => {
+    if (path === '/') {
+      return location.pathname === '/' || location.pathname === '/secretary' || location.pathname === '/responsible'
+    }
+    return location.pathname === path
+  }, [location.pathname]);
 
   useEffect(() => {
     let submenuMatched = false;
     const menuGroups: { type: MenuType; items: NavItem[] }[] = [
       { type: "common", items: commonItems },
       { type: "admin", items: adminItems },
+      { type: "secretary", items: secretaryItems },
       { type: "teacher", items: teacherItems },
+      { type: "responsible", items: responsibleItems },
     ];
     menuGroups.forEach(({ type, items }) => {
       items.forEach((nav, index) => {
@@ -159,22 +181,18 @@ const AppSidebar: React.FC = () => {
               <h2 className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${!isExpanded && !isHovered ? "lg:justify-center" : "justify-start"}`}>
                 {isExpanded || isHovered || isMobileOpen ? "Menu" : <HorizontaLDots className="size-6" />}
               </h2>
-              {renderMenuItems(commonItems, "common")}
+              {role !== "RESPONSIBLE" && renderMenuItems(commonItems, "common")}
             </div>
 
             {role === "ADMIN" && (
               <div>
-                <h2 className={`mb-4 text-xs uppercase flex leading-[20px] font-bold ${!isExpanded && !isHovered ? "lg:justify-center" : "justify-start"}`} style={{ color: "#ef4444" }}>
-                  {isExpanded || isHovered || isMobileOpen ? (
-                    <span className="flex items-center gap-1">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="#ef4444" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z" />
-                      </svg>
-                      Administração
-                    </span>
-                  ) : <HorizontaLDots />}
-                </h2>
                 {renderMenuItems(adminItems, "admin")}
+              </div>
+            )}
+
+            {role === "SECRETARY" && (
+              <div>
+                {renderMenuItems(secretaryItems, "secretary")}
               </div>
             )}
 
@@ -186,6 +204,17 @@ const AppSidebar: React.FC = () => {
                   ) : <HorizontaLDots />}
                 </h2>
                 {renderMenuItems(teacherItems, "teacher")}
+              </div>
+            )}
+
+            {role === "RESPONSIBLE" && (
+              <div>
+                <h2 className={`mb-4 text-xs uppercase flex leading-[20px] font-bold ${!isExpanded && !isHovered ? "lg:justify-center" : "justify-start"}`} style={{ color: "#7c3aed" }}>
+                  {isExpanded || isHovered || isMobileOpen ? (
+                    <span className="flex items-center gap-1"><LuGraduationCap size={14} /> Responsável</span>
+                  ) : <HorizontaLDots />}
+                </h2>
+                {renderMenuItems(responsibleItems, "responsible")}
               </div>
             )}
           </div>

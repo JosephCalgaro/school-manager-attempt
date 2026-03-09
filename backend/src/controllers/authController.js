@@ -56,23 +56,35 @@ export async function login(req, res) {
 
     if (studentRows.length > 0) {
       const student = studentRows[0]
-
       if (!student.password_hash) {
         return res.status(403).json({ error: 'Acesso não configurado. Contate a secretaria.' })
       }
-
       const match = await bcrypt.compare(password, student.password_hash)
-      if (!match) {
-        return res.status(401).json({ error: 'Credenciais inválidas' })
-      }
-
+      if (!match) return res.status(401).json({ error: 'Credenciais inválidas' })
       const token = signToken({ id: student.id, role: 'STUDENT' })
       delete student.password_hash
       return res.json({ user: { ...student, role: 'STUDENT' }, token })
     }
 
-    // Nenhum encontrado
-    return res.status(401).json({ error: 'Credenciais inválidas' })
+    // 3. Tenta responsável
+    const [respRows] = await pool.query(
+      'SELECT id, full_name AS fullName, email, password_hash FROM responsibles WHERE email = ?',
+      [email]
+    )
+
+    if (respRows.length > 0) {
+      const resp = respRows[0]
+      if (!resp.password_hash) {
+        return res.status(403).json({ error: 'Senha não configurada. Contate a secretaria para definir sua senha.' })
+      }
+      const match = await bcrypt.compare(password, resp.password_hash)
+      if (!match) return res.status(401).json({ error: 'Credenciais inválidas' })
+      const token = signToken({ id: resp.id, role: 'RESPONSIBLE' })
+      delete resp.password_hash
+      return res.json({ user: { ...resp, role: 'RESPONSIBLE' }, token })
+    }
+
+    return res.status(401).json({ error: 'Email não encontrado. Verifique suas credenciais.' })
 
   } catch (err) {
     console.error(err)

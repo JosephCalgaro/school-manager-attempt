@@ -38,4 +38,33 @@ export async function ensureContactColumns() {
   await addPhoneColumnIfMissing('students')
   await addPhoneColumnIfMissing('responsibles')
   await addStudentPasswordHashIfMissing()
+  await ensureUserExtraColumns()
+  await ensureResponsiblePasswordHash()
+}
+
+async function ensureResponsiblePasswordHash() {
+  const [rows] = await pool.query(
+    `SELECT 1 FROM information_schema.columns
+     WHERE table_schema = DATABASE() AND table_name = 'responsibles' AND column_name = 'password_hash' LIMIT 1`
+  )
+  if (rows.length === 0) {
+    await pool.query(`ALTER TABLE \`responsibles\` ADD COLUMN password_hash VARCHAR(255) NULL`)
+    console.log('[migration] Coluna password_hash adicionada à tabela responsibles')
+  }
+}
+
+async function ensureUserExtraColumns() {
+  const cols = ['cpf VARCHAR(20) NULL', 'rg VARCHAR(20) NULL', 'birth_date DATE NULL']
+  for (const colDef of cols) {
+    const colName = colDef.split(' ')[0]
+    const [rows] = await pool.query(
+      `SELECT 1 FROM information_schema.columns
+       WHERE table_schema = DATABASE() AND table_name = 'users' AND column_name = ? LIMIT 1`,
+      [colName]
+    )
+    if (rows.length === 0) {
+      await pool.query(`ALTER TABLE \`users\` ADD COLUMN ${colDef}`)
+      console.log(`[migration] Coluna ${colName} adicionada à tabela users`)
+    }
+  }
 }

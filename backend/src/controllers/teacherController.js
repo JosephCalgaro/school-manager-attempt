@@ -242,6 +242,31 @@ async function getTeacherClassesWithStats(teacherId, userRole) {
   return rows
 }
 
+export async function getTeacherStudents(req, res) {
+  try {
+    const teacherId = req.userId
+    const [rows] = await pool.query(
+      `SELECT DISTINCT
+        s.id,
+        s.full_name,
+        s.email,
+        s.phone,
+        c.id   AS class_id,
+        c.name AS class_name
+      FROM students s
+      JOIN class_students cs ON cs.student_id = s.id
+      JOIN classes c ON c.id = cs.class_id
+      WHERE c.teacher_id = ?
+      ORDER BY s.full_name`,
+      [teacherId]
+    )
+    return res.json(rows)
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ error: 'Erro ao buscar alunos' })
+  }
+}
+
 async function getClassAssignments(classId, totalStudents = 0) {
   try {
     const [rows] = await pool.query(
@@ -1014,5 +1039,259 @@ export async function deleteClassAssignment(req, res) {
   } catch (error) {
     console.error(error)
     res.status(500).json({ error: 'Erro ao remover atividade' })
+  }
+}
+
+// ─── LESSON PLANS (biblioteca + vínculo por turma) ───────────────────────────
+
+async function ensureLessonPlanTables() {
+  // Migração: remover tabela antiga se existir
+  await pool.query(`DROP TABLE IF EXISTS lesson_plans`)
+
+  // Biblioteca de templates (por professor)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS lesson_plan_templates (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      teacher_id  INT NOT NULL,
+      title       VARCHAR(255) NOT NULL,
+      description TEXT NULL,
+      created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_lpt_teacher (teacher_id)
+    )
+  `)
+
+  // Instâncias vinculadas a turmas
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS class_lesson_plans (
+      id               INT AUTO_INCREMENT PRIMARY KEY,
+      template_id      INT NOT NULL,
+      class_id         INT NOT NULL,
+      planned_date     DATE NOT NULL,
+      status           ENUM('PLANNED','DONE','CANCELLED') NOT NULL DEFAULT 'PLANNED',
+      completion_notes TEXT NULL,
+      created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_clp_class    (class_id),
+      INDEX idx_clp_template (template_id),
+      INDEX idx_clp_date     (planned_date)
+    )
+  `)
+}
+
+
+// ── TEMPLATES (biblioteca do professor) ──────────────────────────────────────
+
+// GET /teacher/lesson-plans
+export async function getMyTemplates(req, res) {
+  try {
+    await ensureLessonPlanTables()
+    const teacherId = isAdminRole(req.userRole) ? null : req.userId
+    const [rows] = teacherId
+      ? await pool.query(
+          `SELECT id, teacher_id, title, description, created_at, updated_at
+           FROM lesson_plan_templates WHERE teacher_id = ? ORDER BY title`,
+          [teacherId]
+        )
+      : await pool.query(
+          `SELECT t.id, t.teacher_id, u.full_name AS teacher_name, t.title, t.description, t.created_at
+           FROM lesson_plan_templates t
+           LEFT JOIN users u ON u.id = t.teacher_id
+           ORDER BY u.full_name, t.title`
+        )
+    res.json(rows)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Erro ao buscar templates' })
+  }
+}
+
+// POST /teacher/lesson-plans
+export async function createTemplate(req, res) {
+  const { title, description } = req.body || {}
+  if (!title || String(title).trim() === '')
+    return res.status(400).json({ error: 'Título é obrigatório' })
+  try {
+    await ensureLessonPlanTables()
+    const [result] = await pool.query(
+      `INSERT INTO lesson_plan_templates (teacher_id, title, description) VALUES (?, ?, ?)`,
+      [req.userId, String(title).trim(), description || null]
+    )
+    const [rows] = await pool.query('SELECT * FROM lesson_plan_templates WHERE id = ?', [result.insertId])
+    res.status(201).json(rows[0])
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Erro ao criar template' })
+  }
+}
+
+// PUT /teacher/lesson-plans/:templateId
+export async function updateTemplate(req, res) {
+  const templateId = Number(req.params.templateId)
+  const { title, description } = req.body || {}
+  if (!Number.isInteger(templateId)) return res.status(400).json({ error: 'ID inválido' })
+  try {
+    await ensureLessonPlanTables()
+    const whereClause = isAdminRole(req.userRole)
+      ? 'WHERE id = ?' : 'WHERE id = ? AND teacher_id = ?'
+    const whereParams = isAdminRole(req.userRole)
+      ? [templateId] : [templateId, req.userId]
+
+    const [existing] = await pool.query(`SELECT id FROM lesson_plan_templates ${whereClause}`, whereParams)
+    if (existing.length === 0) return res.status(404).json({ error: 'Template não encontrado' })
+
+    const fields = []; const values = []
+    if (title !== undefined)       { fields.push('title = ?');       values.push(String(title).trim()) }
+    if (description !== undefined) { fields.push('description = ?'); values.push(description || null) }
+    if (fields.length === 0) return res.status(400).json({ error: 'Nenhum campo para atualizar' })
+
+    await pool.query(`UPDATE lesson_plan_templates SET ${fields.join(', ')} WHERE id = ?`, [...values, templateId])
+    const [rows] = await pool.query('SELECT * FROM lesson_plan_templates WHERE id = ?', [templateId])
+    res.json(rows[0])
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Erro ao atualizar template' })
+  }
+}
+
+// DELETE /teacher/lesson-plans/:templateId
+export async function deleteTemplate(req, res) {
+  const templateId = Number(req.params.templateId)
+  if (!Number.isInteger(templateId)) return res.status(400).json({ error: 'ID inválido' })
+  try {
+    await ensureLessonPlanTables()
+    const whereClause = isAdminRole(req.userRole) ? 'WHERE id = ?' : 'WHERE id = ? AND teacher_id = ?'
+    const whereParams = isAdminRole(req.userRole) ? [templateId] : [templateId, req.userId]
+    const [result] = await pool.query(`DELETE FROM lesson_plan_templates ${whereClause}`, whereParams)
+    if (result.affectedRows === 0) return res.status(404).json({ error: 'Template não encontrado' })
+    // desvincula das turmas também
+    await pool.query('DELETE FROM class_lesson_plans WHERE template_id = ?', [templateId])
+    res.json({ message: 'Template removido com sucesso' })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Erro ao remover template' })
+  }
+}
+
+// ── VÍNCULOS (instâncias por turma) ──────────────────────────────────────────
+
+// GET /teacher/classes/:id/lesson-plans
+export async function getLessonPlans(req, res) {
+  const classId = Number(req.params.id)
+  if (!Number.isInteger(classId)) return res.status(400).json({ error: 'ID inválido' })
+  try {
+    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole)
+    if (!classInfo) return res.status(404).json({ error: 'Turma não encontrada' })
+    await ensureLessonPlanTables()
+    const [rows] = await pool.query(
+      `SELECT clp.id, clp.template_id, clp.class_id, clp.planned_date,
+              clp.status, clp.completion_notes, clp.created_at,
+              t.title, t.description
+       FROM class_lesson_plans clp
+       JOIN lesson_plan_templates t ON t.id = clp.template_id
+       WHERE clp.class_id = ?
+       ORDER BY clp.planned_date ASC, clp.id ASC`,
+      [classId]
+    )
+    res.json(rows)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Erro ao buscar planos da turma' })
+  }
+}
+
+// POST /teacher/classes/:id/lesson-plans  (vincular template a turma)
+export async function createLessonPlan(req, res) {
+  const classId = Number(req.params.id)
+  const { template_id, planned_date } = req.body || {}
+  if (!Number.isInteger(classId)) return res.status(400).json({ error: 'ID inválido' })
+  if (!Number.isInteger(Number(template_id))) return res.status(400).json({ error: 'template_id é obrigatório' })
+  if (!isValidISODate(planned_date)) return res.status(400).json({ error: 'planned_date deve ser YYYY-MM-DD' })
+  try {
+    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole)
+    if (!classInfo) return res.status(404).json({ error: 'Turma não encontrada' })
+    await ensureLessonPlanTables()
+    const whereClause = isAdminRole(req.userRole) ? 'WHERE id = ?' : 'WHERE id = ? AND teacher_id = ?'
+    const whereParams = isAdminRole(req.userRole) ? [Number(template_id)] : [Number(template_id), req.userId]
+    const [tRows] = await pool.query(`SELECT id FROM lesson_plan_templates ${whereClause}`, whereParams)
+    if (tRows.length === 0) return res.status(404).json({ error: 'Template não encontrado' })
+    const [result] = await pool.query(
+      `INSERT INTO class_lesson_plans (template_id, class_id, planned_date) VALUES (?, ?, ?)`,
+      [Number(template_id), classId, planned_date]
+    )
+    const [rows] = await pool.query(
+      `SELECT clp.id, clp.template_id, clp.class_id, clp.planned_date,
+              clp.status, clp.completion_notes, clp.created_at, t.title, t.description
+       FROM class_lesson_plans clp
+       JOIN lesson_plan_templates t ON t.id = clp.template_id
+       WHERE clp.id = ?`,
+      [result.insertId]
+    )
+    res.status(201).json(rows[0])
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Erro ao vincular plano' })
+  }
+}
+
+// PUT /teacher/classes/:id/lesson-plans/:planId  (status / completion_notes / data)
+export async function updateLessonPlan(req, res) {
+  const classId = Number(req.params.id)
+  const planId  = Number(req.params.planId)
+  const { planned_date, status, completion_notes } = req.body || {}
+  if (!Number.isInteger(classId) || !Number.isInteger(planId))
+    return res.status(400).json({ error: 'IDs inválidos' })
+  const VALID_STATUS = ['PLANNED', 'DONE', 'CANCELLED']
+  if (status !== undefined && !VALID_STATUS.includes(String(status).toUpperCase()))
+    return res.status(400).json({ error: `status deve ser: ${VALID_STATUS.join(', ')}` })
+  try {
+    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole)
+    if (!classInfo) return res.status(404).json({ error: 'Turma não encontrada' })
+    await ensureLessonPlanTables()
+    const [existing] = await pool.query(
+      'SELECT id FROM class_lesson_plans WHERE id = ? AND class_id = ?', [planId, classId]
+    )
+    if (existing.length === 0) return res.status(404).json({ error: 'Vínculo não encontrado nesta turma' })
+    const fields = []; const values = []
+    if (planned_date !== undefined) {
+      if (!isValidISODate(planned_date)) return res.status(400).json({ error: 'planned_date inválido' })
+      fields.push('planned_date = ?'); values.push(planned_date)
+    }
+    if (status !== undefined)           { fields.push('status = ?');           values.push(String(status).toUpperCase()) }
+    if (completion_notes !== undefined) { fields.push('completion_notes = ?'); values.push(completion_notes || null) }
+    if (fields.length === 0) return res.status(400).json({ error: 'Nenhum campo para atualizar' })
+    await pool.query(`UPDATE class_lesson_plans SET ${fields.join(', ')} WHERE id = ?`, [...values, planId])
+    const [rows] = await pool.query(
+      `SELECT clp.id, clp.template_id, clp.class_id, clp.planned_date,
+              clp.status, clp.completion_notes, clp.created_at, t.title, t.description
+       FROM class_lesson_plans clp
+       JOIN lesson_plan_templates t ON t.id = clp.template_id
+       WHERE clp.id = ?`, [planId]
+    )
+    res.json(rows[0])
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Erro ao atualizar vínculo' })
+  }
+}
+
+// DELETE /teacher/classes/:id/lesson-plans/:planId  (desvincular)
+export async function deleteLessonPlan(req, res) {
+  const classId = Number(req.params.id)
+  const planId  = Number(req.params.planId)
+  if (!Number.isInteger(classId) || !Number.isInteger(planId))
+    return res.status(400).json({ error: 'IDs inválidos' })
+  try {
+    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole)
+    if (!classInfo) return res.status(404).json({ error: 'Turma não encontrada' })
+    await ensureLessonPlanTables()
+    const [result] = await pool.query(
+      'DELETE FROM class_lesson_plans WHERE id = ? AND class_id = ?', [planId, classId]
+    )
+    if (result.affectedRows === 0) return res.status(404).json({ error: 'Vínculo não encontrado' })
+    res.json({ message: 'Plano desvinculado com sucesso' })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Erro ao desvincular plano' })
   }
 }

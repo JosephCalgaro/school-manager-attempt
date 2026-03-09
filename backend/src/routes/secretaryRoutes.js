@@ -1,0 +1,52 @@
+import { Router } from 'express'
+import {
+  getAllStudents, getStudentDetails, createStudent, updateStudentDetails,
+  getStudentClasses, getStudentAttendance, getStudentAssignments,
+  getSecretaryStats,
+  getAllClasses, createClass, updateClass,
+  getClassStudentsList, addStudentToClass, removeStudentFromClass,
+} from '../controllers/adminController.js'
+import {
+  getAllResponsibles, getResponsibleById,
+  createResponsible, updateResponsible, deleteResponsible,
+  getStudentsByResponsibleId,
+} from '../controllers/responsiblesController.js'
+
+const router = Router()
+
+const isSecretary = (req, res, next) => {
+  const role = (req.userRole || '').toUpperCase()
+  if (role !== 'SECRETARY' && role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Acesso negado.' })
+  }
+  next()
+}
+
+router.use(isSecretary)
+
+router.get('/stats',             getSecretaryStats)
+router.get('/students',          getAllStudents)
+router.get('/students/:id',      getStudentDetails)
+router.post('/students',         createStudent)
+router.put('/students/:id',      updateStudentDetails)
+router.get('/students/:id/classes',     getStudentClasses)
+router.get('/students/:id/attendance',  getStudentAttendance)
+router.get('/students/:id/assignments', getStudentAssignments)
+
+// Turmas
+router.get('/classes',                          getAllClasses)
+router.post('/classes',                         createClass)
+router.put('/classes/:id',                      updateClass)
+router.get('/classes/:id/students',             getClassStudentsList)
+router.post('/classes/:id/students',            addStudentToClass)
+router.delete('/classes/:id/students/:studentId', removeStudentFromClass)
+
+// Responsáveis
+router.get('/responsibles',                    getAllResponsibles)
+router.get('/responsibles/:id',                getResponsibleById)
+router.post('/responsibles',                   createResponsible)
+router.put('/responsibles/:id',                updateResponsible)
+router.delete('/responsibles/:id',             deleteResponsible)
+router.get('/responsibles/:id/students',       getStudentsByResponsibleId)
+
+export default router

@@ -16,14 +16,21 @@ import AdminClasses from "./pages/AdminPages/AdminClasses";
 import AdminClassDetail from "./pages/AdminPages/AdminClassDetail";
 import TeacherDashboard from "./pages/TeacherPages/TeacherDashboard";
 import TeacherClassDetail from "./pages/TeacherPages/TeacherClassDetail";
+import TeacherStudents from "./pages/TeacherPages/TeacherStudents";
+import TeacherLessonPlans from "./pages/TeacherPages/TeacherLessonPlans";
+import SecretaryStudents from "./pages/SecretaryPages/SecretaryStudents";
+import SecretaryHome from "./pages/SecretaryPages/SecretaryHome";
+import SecretaryClasses from "./pages/SecretaryPages/SecretaryClasses";
+import SecretaryResponsibles from "./pages/SecretaryPages/SecretaryResponsibles";
 import StudentDashboard from "./pages/StudentPages/StudentDashboard";
+import ResponsibleDashboard from "./pages/ResponsiblePages/ResponsibleDashboard";
 
 // Redireciona alunos para /student, demais usuários ficam no Home padrão
 function HomeRedirect() {
   const { user } = useAuth()
-  if (user?.role === 'STUDENT') {
-    return <Navigate to="/student" replace />
-  }
+  if (user?.role === 'STUDENT')    return <Navigate to="/student" replace />
+  if (user?.role === 'SECRETARY')  return <Navigate to="/secretary" replace />
+  if (user?.role === 'RESPONSIBLE') return <Navigate to="/responsible" replace />
   return <Home />
 }
 
@@ -45,6 +52,9 @@ export default function App() {
             {/* Student */}
             <Route path="/student" element={<StudentDashboard />} />
 
+            {/* Responsible */}
+            <Route path="/responsible" element={<ResponsibleDashboard />} />
+
             {/* Common */}
             <Route path="/profile" element={<UserProfiles />} />
             <Route path="/calendar" element={<Calendar />} />
@@ -55,10 +65,19 @@ export default function App() {
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/classes" element={<AdminClasses />} />
             <Route path="/admin/classes/:id" element={<AdminClassDetail />} />
+            <Route path="/admin/responsibles" element={<SecretaryResponsibles apiBase="/admin" />} />
+
+            {/* Secretary */}
+            <Route path="/secretary" element={<SecretaryHome />} />
+            <Route path="/secretary/students" element={<SecretaryStudents />} />
+            <Route path="/secretary/classes" element={<SecretaryClasses />} />
+            <Route path="/secretary/responsibles" element={<SecretaryResponsibles />} />
 
             {/* Teacher */}
             <Route path="/teacher" element={<TeacherDashboard />} />
+            <Route path="/teacher/students" element={<TeacherStudents />} />
             <Route path="/teacher/classes/:id" element={<TeacherClassDetail />} />
+            <Route path="/teacher/lesson-plans" element={<TeacherLessonPlans />} />
           </Route>
 
           <Route path="/signin" element={<SignIn />} />

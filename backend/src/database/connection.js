@@ -23,7 +23,9 @@ const pool = mysql.createPool({
     // Numero maximo de conexões simultaneas
     connectionLimit: 20,
     // Fila de requisições (0 = sem limites)
-    queueLimit: 0
+    queueLimit: 0,
+    // Retorna DATE/DATETIME como strings (evita conversão para Date JS + timezone bugs)
+    dateStrings: true,
 })
 
 // exporta pool para ser usado em qualquer parte do projeto
