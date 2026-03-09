@@ -35,7 +35,7 @@ export async function getMyProfile(req, res) {
 export async function getMyClasses(req, res) {
   try {
     const [rows] = await pool.query(
-      `SELECT c.id, c.name, c.schedule,
+      `SELECT c.id, c.name, c.schedule, c.classroom,
               u.full_name AS teacher_name
        FROM classes c
        INNER JOIN class_students cs ON c.id = cs.class_id
@@ -65,7 +65,7 @@ export async function getMyClassDetails(req, res) {
     }
 
     const [classRows] = await pool.query(
-      `SELECT c.id, c.name, c.schedule,
+      `SELECT c.id, c.name, c.schedule, c.classroom, c.teacher_id,
               u.full_name AS teacher_name, u.email AS teacher_email
        FROM classes c
        LEFT JOIN users u ON c.teacher_id = u.id
@@ -85,7 +85,23 @@ export async function getMyClassDetails(req, res) {
       [req.userId, req.params.classId]
     )
 
-    res.json({ ...classRows[0], assignments })
+    // Arquivos anexados às atividades
+    let assignmentsWithFiles = assignments
+    if (assignments.length > 0) {
+      const ids = assignments.map(a => a.id)
+      const [fileRows] = await pool.query(
+        `SELECT id, assignment_id, original_name, stored_name FROM assignment_files WHERE assignment_id IN (?)`,
+        [ids]
+      ).catch(() => [[]])
+      const fileMap = new Map()
+      for (const f of fileRows) {
+        if (!fileMap.has(f.assignment_id)) fileMap.set(f.assignment_id, [])
+        fileMap.get(f.assignment_id).push({ id: f.id, originalName: f.original_name, url: `/uploads/assignments/${f.stored_name}` })
+      }
+      assignmentsWithFiles = assignments.map(a => ({ ...a, files: fileMap.get(a.id) || [] }))
+    }
+
+    res.json({ ...classRows[0], assignments: assignmentsWithFiles })
   } catch (err) {
     console.error(err)
     res.status(500).json({ message: 'Erro ao buscar detalhes da turma' })

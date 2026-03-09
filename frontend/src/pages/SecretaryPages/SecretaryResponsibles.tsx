@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import { LuSearch, LuX, LuPlus, LuEye, LuUsers } from 'react-icons/lu'
+import { LuSearch, LuX, LuPlus, LuEye, LuUsers, LuPowerOff, LuPower } from 'react-icons/lu'
 import { useAuth } from '../../hooks/useAuth'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Responsible {
   id: number; full_name: string; cpf: string; rg: string | null
   birth_date: string | null; address: string | null
-  email: string; phone: string | null; created_at: string
+  email: string; phone: string | null; created_at: string; is_active: number
 }
 interface ResponsibleStudent {
   id: number; full_name: string; cpf: string; email: string; phone: string | null
@@ -179,6 +179,8 @@ export default function SecretaryResponsibles({ apiBase = '/secretary' }: { apiB
   const [limit]                  = useState(10)
   const [modal,    setModal]     = useState<null | 'new' | Responsible>(null)
   const [studentsModal, setStudentsModal] = useState<Responsible | null>(null)
+  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active')
+  const [togglingId, setTogglingId] = useState<number | null>(null)
 
   const fetchResponsibles = useCallback(async () => {
     try {
@@ -186,6 +188,7 @@ export default function SecretaryResponsibles({ apiBase = '/secretary' }: { apiB
       const params = new URLSearchParams({
         limit: limit.toString(), offset: (page * limit).toString(),
         ...(search && { search }),
+        ...(statusFilter !== 'all' && { status: statusFilter }),
       })
       const res = await authFetch(`${apiBase}/responsibles?${params}`)
       if (!res.ok) throw new Error()
@@ -193,13 +196,21 @@ export default function SecretaryResponsibles({ apiBase = '/secretary' }: { apiB
       setResponsibles(data.data); setTotal(data.total)
     } catch { /* silent */ }
     finally { setLoading(false) }
-  }, [search, page, limit, authFetch, apiBase])
+  }, [search, statusFilter, page, limit, authFetch, apiBase])
 
   useEffect(() => { fetchResponsibles() }, [fetchResponsibles])
 
   const openEdit = async (id: number) => {
     const res = await authFetch(`${apiBase}/responsibles/${id}`)
     if (res.ok) setModal(await res.json())
+  }
+
+  const handleToggle = async (r: Responsible) => {
+    setTogglingId(r.id)
+    try {
+      await authFetch(`${apiBase}/responsibles/${r.id}/toggle`, { method: 'PATCH' })
+      await fetchResponsibles()
+    } finally { setTogglingId(null) }
   }
 
   const totalPages = Math.ceil(total / limit)
@@ -217,11 +228,23 @@ export default function SecretaryResponsibles({ apiBase = '/secretary' }: { apiB
         </button>
       </div>
 
-      <div className="relative">
-        <LuSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input value={search} onChange={e => { setSearch(e.target.value); setPage(0) }}
-          placeholder="Buscar por nome, email ou CPF..."
-          className="h-11 w-full rounded-xl border border-gray-300 bg-white pl-10 pr-4 text-sm outline-none focus:ring-2 ring-brand-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white" />
+      <div className="flex flex-wrap gap-3">
+        <div className="relative flex-1 min-w-48">
+          <LuSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input value={search} onChange={e => { setSearch(e.target.value); setPage(0) }}
+            placeholder="Buscar por nome, email ou CPF..."
+            className="h-11 w-full rounded-xl border border-gray-300 bg-white pl-10 pr-4 text-sm outline-none focus:ring-2 ring-brand-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white" />
+        </div>
+        <div className="flex items-center gap-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-1">
+          {(['active', 'inactive', 'all'] as const).map(s => (
+            <button key={s} onClick={() => { setStatusFilter(s); setPage(0); }}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                statusFilter === s ? 'bg-brand-500 text-white' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+              }`}>
+              {s === 'active' ? 'Ativos' : s === 'inactive' ? 'Inativos' : 'Todos'}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 overflow-hidden shadow-sm">
@@ -235,7 +258,7 @@ export default function SecretaryResponsibles({ apiBase = '/secretary' }: { apiB
               <table className="w-full text-sm">
                 <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-700">
                   <tr>
-                    {['Nome', 'Email', 'Telefone', 'CPF', 'Cadastro', 'Ações'].map(h => (
+                    {['Nome', 'Status', 'Email', 'Telefone', 'CPF', 'Cadastro', 'Ações'].map(h => (
                       <th key={h} className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-gray-300">{h}</th>
                     ))}
                   </tr>
@@ -244,6 +267,14 @@ export default function SecretaryResponsibles({ apiBase = '/secretary' }: { apiB
                   {responsibles.map(r => (
                     <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
                       <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{r.full_name}</td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                          r.is_active ? 'bg-success-50 text-success-700 dark:bg-success-900/20 dark:text-success-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                        }`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${r.is_active ? 'bg-success-500' : 'bg-gray-400'}`} />
+                          {r.is_active ? 'Ativo' : 'Inativo'}
+                        </span>
+                      </td>
                       <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{r.email}</td>
                       <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{r.phone || '-'}</td>
                       <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{r.cpf}</td>
@@ -259,6 +290,12 @@ export default function SecretaryResponsibles({ apiBase = '/secretary' }: { apiB
                           <button onClick={() => openEdit(r.id)}
                             className="text-brand-600 dark:text-brand-400 hover:underline font-medium text-sm">
                             Editar
+                          </button>
+                          <button onClick={() => handleToggle(r)} disabled={togglingId === r.id}
+                            className={`flex items-center gap-1 text-sm font-medium disabled:opacity-50 ${
+                              r.is_active ? 'text-error-600 hover:text-error-700 dark:text-error-400' : 'text-success-600 hover:text-success-700 dark:text-success-400'
+                            }`}>
+                            {r.is_active ? <><LuPowerOff className="h-3.5 w-3.5" /> Desativar</> : <><LuPower className="h-3.5 w-3.5" /> Reativar</>}
                           </button>
                         </div>
                       </td>

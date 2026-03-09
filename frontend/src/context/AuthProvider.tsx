@@ -1,4 +1,4 @@
-import { useState, useEffect, ReactNode, useCallback } from 'react'
+import { useState, useEffect, useRef, ReactNode, useCallback } from 'react'
 import { useNavigate } from 'react-router'
 import { AuthContext, User } from './AuthContext'
 
@@ -7,6 +7,7 @@ import { AuthContext, User } from './AuthContext'
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [token, setToken] = useState<string | null>(null)
+  const tokenRef = useRef<string | null>(null)
   const navigate = useNavigate()
 
   // read from localStorage on mount
@@ -15,6 +16,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (saved) {
       try {
         const data = JSON.parse(saved)
+        tokenRef.current = data.token
         setUser(data.user)
         setToken(data.token)
       } catch {
@@ -24,6 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const saveSession = (userData: User, jwt: string) => {
+    tokenRef.current = jwt
     setUser(userData)
     setToken(jwt)
     localStorage.setItem('auth', JSON.stringify({ user: userData, token: jwt }))
@@ -45,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = () => {
+    tokenRef.current = null
     setUser(null)
     setToken(null)
     localStorage.removeItem('auth')
@@ -53,9 +57,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const authFetch = useCallback((input: RequestInfo, init: RequestInit = {}) => {
     const headers = new Headers(init.headers || {})
-    if (token) headers.set('Authorization', `Bearer ${token}`)
+    if (tokenRef.current) headers.set('Authorization', `Bearer ${tokenRef.current}`)
     return fetch(input, { ...init, headers })
-  }, [token])
+  }, []) // ref sempre atualizado — não precisa de token como dep
 
   return (
     <AuthContext.Provider value={{ user, token, login, logout, authFetch }}>

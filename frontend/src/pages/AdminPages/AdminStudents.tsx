@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { LuSearch, LuX, LuPlus, LuUserPlus } from 'react-icons/lu';
+import { LuSearch, LuX, LuPlus, LuUserPlus, LuPowerOff, LuPower } from 'react-icons/lu';
 
 interface Student {
   id: number;
@@ -11,6 +11,7 @@ interface Student {
   birth_date: string;
   address: string;
   created_at: string;
+  is_active: number;
 }
 
 interface StudentDetails extends Student {
@@ -131,6 +132,8 @@ export default function AdminStudents() {
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState<StudentForm | null>(null);
   const [createModal, setCreateModal] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
+  const [togglingId, setTogglingId] = useState<number | null>(null);
 
   const fetchStudents = useCallback(async () => {
     try {
@@ -138,9 +141,9 @@ export default function AdminStudents() {
       const params = new URLSearchParams({
         limit: limit.toString(),
         offset: (page * limit).toString(),
-        ...(search && { search })
+        ...(search && { search }),
+        ...(statusFilter !== 'all' && { status: statusFilter }),
       });
-
       const response = await authFetch(`/admin/students?${params}`);
       if (!response.ok) throw new Error('Erro ao buscar alunos');
       const data = await response.json();
@@ -151,7 +154,7 @@ export default function AdminStudents() {
     } finally {
       setLoading(false);
     }
-  }, [search, page, limit, authFetch]);
+  }, [search, statusFilter, page, limit, authFetch]);
 
   useEffect(() => {
     fetchStudents();
@@ -240,18 +243,27 @@ export default function AdminStudents() {
         </button>
       </div>
 
-      <div className="mb-6 relative">
-        <LuSearch className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Buscar por nome, email ou CPF..."
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(0);
-          }}
-          className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
-        />
+      <div className="mb-6 flex flex-wrap gap-3">
+        <div className="relative flex-1 min-w-48">
+          <LuSearch className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Buscar por nome, email ou CPF..."
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+          />
+        </div>
+        <div className="flex items-center gap-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-1">
+          {(['active', 'inactive', 'all'] as const).map(s => (
+            <button key={s} onClick={() => { setStatusFilter(s); setPage(0); }}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                statusFilter === s ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}>
+              {s === 'active' ? 'Ativos' : s === 'inactive' ? 'Inativos' : 'Todos'}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
@@ -268,8 +280,8 @@ export default function AdminStudents() {
                 <thead className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Nome</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Email</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Telefone</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">CPF</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Ação</th>
                   </tr>
@@ -278,16 +290,39 @@ export default function AdminStudents() {
                   {students.map((student) => (
                     <tr key={student.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
                       <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">{student.full_name}</td>
+                      <td className="px-6 py-4 text-sm">
+                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                          student.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+                        }`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${student.is_active ? 'bg-green-500' : 'bg-gray-400'}`} />
+                          {student.is_active ? 'Ativo' : 'Inativo'}
+                        </span>
+                      </td>
                       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{student.email}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{student.phone || '-'}</td>
                       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{student.cpf}</td>
                       <td className="px-6 py-4 text-sm">
-                        <button
-                          onClick={() => fetchStudentDetails(student.id)}
-                          className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium"
-                        >
-                          Ver Detalhes
-                        </button>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => fetchStudentDetails(student.id)}
+                            className="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium"
+                          >
+                            Ver Detalhes
+                          </button>
+                          <button
+                            onClick={async () => {
+                              setTogglingId(student.id)
+                              try {
+                                await authFetch(`/admin/students/${student.id}/toggle`, { method: 'PATCH' })
+                                await fetchStudents()
+                              } finally { setTogglingId(null) }
+                            }}
+                            disabled={togglingId === student.id}
+                            className={`flex items-center gap-1 text-sm font-medium disabled:opacity-50 ${
+                              student.is_active ? 'text-red-600 hover:text-red-700 dark:text-red-400' : 'text-green-600 hover:text-green-700 dark:text-green-400'
+                            }`}>
+                            {student.is_active ? <><LuPowerOff className="h-3.5 w-3.5" /> Desativar</> : <><LuPower className="h-3.5 w-3.5" /> Reativar</>}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

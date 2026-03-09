@@ -12,6 +12,7 @@ type TeacherClass = {
   id: number
   name: string
   schedule: string | null
+  classroom: string | null
   totalStudents: number
 }
 
@@ -22,6 +23,7 @@ type ClassForm = {
   name: string
   teacherId: string
   schedule: string
+  classroom: string
   students: number[]
 }
 
@@ -240,6 +242,7 @@ function ClassModal({
     name: editing?.name ?? '',
     teacherId: isAdmin ? '' : String(currentUserId),
     schedule: editing?.schedule ?? '',
+    classroom: editing?.classroom ?? '',
     students: [],
   })
   const [students, setStudents] = useState<Student[]>([])
@@ -277,6 +280,8 @@ function ClassModal({
             setForm((prev) => ({
               ...prev,
               students: (data.students ?? []).map((s: { id: number }) => s.id),
+              schedule: data.schedule ?? prev.schedule,
+              classroom: data.classroom ?? '',
               teacherId: isAdmin ? String(data.teacher_id ?? '') : prev.teacherId,
             }))
           }
@@ -303,6 +308,7 @@ function ClassModal({
         name: form.name.trim(),
         teacherId: Number(form.teacherId),
         schedule: form.schedule.trim() || null,
+        classroom: form.classroom.trim() || null,
         students: form.students,
       }
 
@@ -375,6 +381,18 @@ function ClassModal({
                   value={form.schedule}
                   onChange={(e) => setForm((p) => ({ ...p, schedule: e.target.value }))}
                   placeholder="Ex: Seg/Qua 19h–20h30"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Sala
+                </label>
+                <input
+                  value={form.classroom}
+                  onChange={(e) => setForm((p) => ({ ...p, classroom: e.target.value }))}
+                  placeholder="Ex: Sala 3, Lab de Informática"
                   className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                 />
               </div>
@@ -600,6 +618,12 @@ export default function TeacherDashboard({
                     <LuClock3 className="h-4 w-4 shrink-0" />
                     {cls.schedule || 'Horário não informado'}
                   </p>
+                  {cls.classroom && (
+                    <p className="flex items-center gap-2">
+                      <LuBookOpen className="h-4 w-4 shrink-0" />
+                      {cls.classroom}
+                    </p>
+                  )}
                   <p className="flex items-center gap-2">
                     <LuUsers className="h-4 w-4 shrink-0" />
                     {cls.totalStudents} aluno{cls.totalStudents !== 1 ? 's' : ''}

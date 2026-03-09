@@ -10,7 +10,6 @@ async function addPhoneColumnIfMissing(tableName) {
      LIMIT 1`,
     [tableName]
   )
-
   if (rows.length === 0) {
     await pool.query(`ALTER TABLE \`${tableName}\` ADD COLUMN phone VARCHAR(30) NULL`)
   }
@@ -25,21 +24,10 @@ async function addStudentPasswordHashIfMissing() {
        AND column_name = 'password_hash'
      LIMIT 1`
   )
-
   if (rows.length === 0) {
-    // Coluna nullable: alunos existentes ficam sem senha até o admin definir uma
     await pool.query(`ALTER TABLE \`students\` ADD COLUMN password_hash VARCHAR(255) NULL`)
     console.log('[migration] Coluna password_hash adicionada à tabela students')
   }
-}
-
-export async function ensureContactColumns() {
-  await addPhoneColumnIfMissing('users')
-  await addPhoneColumnIfMissing('students')
-  await addPhoneColumnIfMissing('responsibles')
-  await addStudentPasswordHashIfMissing()
-  await ensureUserExtraColumns()
-  await ensureResponsiblePasswordHash()
 }
 
 async function ensureResponsiblePasswordHash() {
@@ -67,4 +55,28 @@ async function ensureUserExtraColumns() {
       console.log(`[migration] Coluna ${colName} adicionada à tabela users`)
     }
   }
+}
+
+async function ensureIsActive(tableName) {
+  const [rows] = await pool.query(
+    `SELECT 1 FROM information_schema.columns
+     WHERE table_schema = DATABASE() AND table_name = ? AND column_name = 'is_active' LIMIT 1`,
+    [tableName]
+  )
+  if (rows.length === 0) {
+    await pool.query(`ALTER TABLE \`${tableName}\` ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1`)
+    console.log(`[migration] Coluna is_active adicionada à tabela ${tableName}`)
+  }
+}
+
+export async function ensureContactColumns() {
+  await addPhoneColumnIfMissing('users')
+  await addPhoneColumnIfMissing('students')
+  await addPhoneColumnIfMissing('responsibles')
+  await addStudentPasswordHashIfMissing()
+  await ensureUserExtraColumns()
+  await ensureResponsiblePasswordHash()
+  await ensureIsActive('classes')
+  await ensureIsActive('students')
+  await ensureIsActive('responsibles')
 }

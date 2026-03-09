@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import { LuSearch, LuX, LuPlus, LuUsers, LuPencil, LuUserMinus } from 'react-icons/lu'
+import { LuSearch, LuX, LuPlus, LuUsers, LuPencil, LuUserMinus, LuPowerOff, LuPower } from 'react-icons/lu'
 import { useAuth } from '../../hooks/useAuth'
 
-interface Class { id: number; name: string; schedule: string | null; teacher_name: string | null; total_students: number }
-interface ClassForm { name: string; schedule: string }
+interface Class { id: number; name: string; schedule: string | null; classroom: string | null; teacher_name: string | null; total_students: number; is_active: number }
+interface ClassForm { name: string; schedule: string; classroom: string }
 interface Student { id: number; full_name: string; email: string; cpf: string }
 
-const emptyForm = (): ClassForm => ({ name: '', schedule: '' })
+const emptyForm = (): ClassForm => ({ name: '', schedule: '', classroom: '' })
 
 // ─── Modal criar / editar turma ──────────────────────────────────────────────
 function ClassModal({ initial, onClose, onSaved, authFetch }: {
@@ -15,7 +15,7 @@ function ClassModal({ initial, onClose, onSaved, authFetch }: {
 }) {
   const isEdit = Boolean(initial?.id)
   const [form, setForm] = useState<ClassForm>(
-    initial ? { name: initial.name, schedule: initial.schedule ?? '' } : emptyForm()
+    initial ? { name: initial.name, schedule: initial.schedule ?? '', classroom: initial.classroom ?? '' } : emptyForm()
   )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -44,8 +44,9 @@ function ClassModal({ initial, onClose, onSaved, authFetch }: {
         <div className="p-6 space-y-4">
           {error && <p className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:border-red-800 dark:text-red-400">{error}</p>}
           {[
-            { key: 'name' as const, label: 'Nome da turma *' },
-            { key: 'schedule' as const, label: 'Horário (ex: Seg/Qua 19h)' },
+            { key: 'name' as const,      label: 'Nome da turma *' },
+            { key: 'schedule' as const,  label: 'Horário (ex: Seg/Qua 19h)' },
+            { key: 'classroom' as const, label: 'Sala (ex: Sala 3, Lab Informática)' },
           ].map(f => (
             <div key={f.key}>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{f.label}</label>
@@ -183,19 +184,31 @@ export default function SecretaryClasses() {
   const [classes, setClasses]   = useState<Class[]>([])
   const [loading, setLoading]   = useState(true)
   const [search, setSearch]     = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('active')
+  const [togglingId, setTogglingId] = useState<number | null>(null)
   const [classModal, setClassModal] = useState<null | 'new' | Class>(null)
   const [studentsModal, setStudentsModal] = useState<Class | null>(null)
 
   const fetchClasses = useCallback(async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams(search ? { search } : {})
+      const params = new URLSearchParams()
+      if (search) params.set('search', search)
+      if (statusFilter !== 'all') params.set('status', statusFilter)
       const res = await authFetch(`/secretary/classes?${params}`)
       if (res.ok) setClasses(await res.json())
     } finally { setLoading(false) }
-  }, [search, authFetch])
+  }, [search, statusFilter, authFetch])
 
   useEffect(() => { fetchClasses() }, [fetchClasses])
+
+  const handleToggle = async (cls: Class) => {
+    setTogglingId(cls.id)
+    try {
+      await authFetch(`/secretary/classes/${cls.id}/toggle`, { method: 'PATCH' })
+      await fetchClasses()
+    } finally { setTogglingId(null) }
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -210,10 +223,25 @@ export default function SecretaryClasses() {
         </button>
       </div>
 
-      <div className="relative">
-        <LuSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nome..."
-          className="h-11 w-full rounded-xl border border-gray-300 bg-white pl-10 pr-4 text-sm outline-none focus:ring-2 ring-brand-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white" />
+      {/* Barra de busca + filtro de status */}
+      <div className="flex flex-wrap gap-3">
+        <div className="relative flex-1 min-w-48">
+          <LuSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nome..."
+            className="h-11 w-full rounded-xl border border-gray-300 bg-white pl-10 pr-4 text-sm outline-none focus:ring-2 ring-brand-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white" />
+        </div>
+        <div className="flex items-center gap-1 rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-900">
+          {(['all', 'active', 'inactive'] as const).map(s => (
+            <button key={s} onClick={() => setStatusFilter(s)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                statusFilter === s
+                  ? 'bg-brand-500 text-white'
+                  : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+              }`}>
+              {s === 'all' ? 'Todas' : s === 'active' ? 'Ativas' : 'Inativas'}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 overflow-hidden shadow-sm">
@@ -226,7 +254,7 @@ export default function SecretaryClasses() {
             <table className="w-full text-sm">
               <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-700">
                 <tr>
-                  {['Nome', 'Horário', 'Professor', 'Alunos', 'Ações'].map(h => (
+                  {['Nome', 'Status', 'Horário', 'Sala', 'Professor', 'Alunos', 'Ações'].map(h => (
                     <th key={h} className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-gray-300">{h}</th>
                   ))}
                 </tr>
@@ -234,8 +262,22 @@ export default function SecretaryClasses() {
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                 {classes.map(c => (
                   <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
-                    <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{c.name}</td>
+                    <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                      {c.name}
+                      {!c.is_active && <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">(inativa)</span>}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        c.is_active
+                          ? 'bg-success-50 text-success-700 dark:bg-success-900/20 dark:text-success-400'
+                          : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                      }`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${c.is_active ? 'bg-success-500' : 'bg-gray-400'}`} />
+                        {c.is_active ? 'Ativa' : 'Inativa'}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{c.schedule || '—'}</td>
+                    <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{c.classroom || '—'}</td>
                     <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{c.teacher_name || '—'}</td>
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 dark:bg-brand-900/20 px-2.5 py-0.5 text-xs font-medium text-brand-700 dark:text-brand-400">
@@ -251,6 +293,19 @@ export default function SecretaryClasses() {
                         <button onClick={() => setClassModal(c)}
                           className="flex items-center gap-1 text-sm text-brand-600 dark:text-brand-400 hover:underline font-medium">
                           <LuPencil className="h-3.5 w-3.5" /> Editar
+                        </button>
+                        <button
+                          onClick={() => handleToggle(c)}
+                          disabled={togglingId === c.id}
+                          title={c.is_active ? 'Desativar turma' : 'Reativar turma'}
+                          className={`flex items-center gap-1 text-sm font-medium disabled:opacity-50 transition-colors ${
+                            c.is_active
+                              ? 'text-error-600 hover:text-error-700 dark:text-error-400'
+                              : 'text-success-600 hover:text-success-700 dark:text-success-400'
+                          }`}>
+                          {c.is_active
+                            ? <><LuPowerOff className="h-3.5 w-3.5" /> Desativar</>
+                            : <><LuPower className="h-3.5 w-3.5" /> Reativar</>}
                         </button>
                       </div>
                     </td>

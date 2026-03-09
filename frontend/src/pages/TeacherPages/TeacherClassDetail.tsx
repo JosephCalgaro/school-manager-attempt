@@ -1,5 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router'
+import { LuClock3, LuDoorOpen, LuArrowLeft } from 'react-icons/lu'
+import { useNavigate } from 'react-router'
 import { useAuth } from '../../hooks/useAuth'
 
 type AssignmentFile = {
@@ -51,6 +53,7 @@ type ClassDetail = {
   id: number
   name: string
   schedule: string | null
+  classroom: string | null
   totalStudents: number
   attendanceRate: number
   students: Student[]
@@ -73,8 +76,8 @@ type UploadPayload = {
   contentBase64: string
 }
 
-const inputBlueClass =
-  'w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-blue-700 placeholder:text-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-blue-400 dark:placeholder:text-blue-500'
+const inputCls =
+  'w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30'
 
 async function fileToPayload(file: File): Promise<UploadPayload> {
   const base64 = await new Promise<string>((resolve, reject) => {
@@ -98,6 +101,7 @@ export default function TeacherClassDetail({ apiBase = '/teacher' }: TeacherClas
   const { id } = useParams()
   const classId = Number(id)
   const { authFetch } = useAuth()
+  const navigate = useNavigate()
 
   const [tab, setTab] = useState<TabKey>('students')
   const [data, setData] = useState<ClassDetail | null>(null)
@@ -483,17 +487,34 @@ export default function TeacherClassDetail({ apiBase = '/teacher' }: TeacherClas
   return (
     <div className="space-y-6">
       <header className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
+        <button onClick={() => navigate(-1)} className="mb-3 flex items-center gap-1.5 text-xs text-gray-500 hover:text-brand-600 dark:text-gray-400 dark:hover:text-brand-400 transition-colors">
+          <LuArrowLeft className="h-3.5 w-3.5" /> Voltar
+        </button>
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">{data.name}</h1>
-        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Horário: {data.schedule || 'Não informado'}</p>
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
+          <span className="flex items-center gap-1.5">
+            <LuClock3 className="h-3.5 w-3.5" /> {data.schedule || 'Horário não informado'}
+          </span>
+          {data.classroom && (
+            <span className="flex items-center gap-1.5">
+              <LuDoorOpen className="h-3.5 w-3.5" /> {data.classroom}
+            </span>
+          )}
+          <span className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500">
+            {data.totalStudents} aluno{data.totalStudents !== 1 ? 's' : ''} · {data.attendanceRate.toFixed(1)}% presença
+          </span>
+        </div>
       </header>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1 rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-800 dark:bg-gray-900">
         {TAB_ITEMS.map((item) => (
           <button
             key={item.key}
             onClick={() => setTab(item.key)}
-            className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-              tab === item.key ? 'bg-brand-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800'
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+              tab === item.key
+                ? 'bg-brand-500 text-white shadow-sm'
+                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200'
             }`}
           >
             {item.label}
@@ -533,7 +554,7 @@ export default function TeacherClassDetail({ apiBase = '/teacher' }: TeacherClas
         <div className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
           <div className="flex flex-wrap items-center gap-3">
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="attendance-date">Data da chamada</label>
-            <input id="attendance-date" type="date" value={attendanceDate} onChange={(e) => setAttendanceDate(e.target.value)} className={inputBlueClass} />
+            <input id="attendance-date" type="date" value={attendanceDate} onChange={(e) => setAttendanceDate(e.target.value)} className={inputCls} />
           </div>
           <div className="space-y-2">
             {studentList.map((student) => (
@@ -564,15 +585,15 @@ export default function TeacherClassDetail({ apiBase = '/teacher' }: TeacherClas
                   <li key={assignment.id} className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
                     {editingAssignmentId === assignment.id ? (
                       <div className="space-y-2">
-                        <input value={editAssignment.title} onChange={(e) => setEditAssignment((prev) => ({ ...prev, title: e.target.value }))} placeholder="Título" className={inputBlueClass} />
-                        <input type="date" value={editAssignment.dueDate} onChange={(e) => setEditAssignment((prev) => ({ ...prev, dueDate: e.target.value }))} className={inputBlueClass} />
-                        <select value={editAssignment.type} onChange={(e) => setEditAssignment((prev) => ({ ...prev, type: e.target.value }))} className={inputBlueClass}>
+                        <input value={editAssignment.title} onChange={(e) => setEditAssignment((prev) => ({ ...prev, title: e.target.value }))} placeholder="Título" className={inputCls} />
+                        <input type="date" value={editAssignment.dueDate} onChange={(e) => setEditAssignment((prev) => ({ ...prev, dueDate: e.target.value }))} className={inputCls} />
+                        <select value={editAssignment.type} onChange={(e) => setEditAssignment((prev) => ({ ...prev, type: e.target.value }))} className={inputCls}>
                           <option value="WORK">WORK</option>
                           <option value="EXAM">EXAM</option>
                         </select>
-                        <input type="number" min="0" value={editAssignment.maxScore} onChange={(e) => setEditAssignment((prev) => ({ ...prev, maxScore: e.target.value }))} placeholder="Nota máxima" className={inputBlueClass} />
-                        <textarea value={editAssignment.description} onChange={(e) => setEditAssignment((prev) => ({ ...prev, description: e.target.value }))} rows={3} placeholder="Descrição" className={inputBlueClass} />
-                        <input type="file" multiple onChange={(e) => setEditAssignmentFiles(Array.from(e.target.files || []))} className={inputBlueClass} />
+                        <input type="number" min="0" value={editAssignment.maxScore} onChange={(e) => setEditAssignment((prev) => ({ ...prev, maxScore: e.target.value }))} placeholder="Nota máxima" className={inputCls} />
+                        <textarea value={editAssignment.description} onChange={(e) => setEditAssignment((prev) => ({ ...prev, description: e.target.value }))} rows={3} placeholder="Descrição" className={inputCls} />
+                        <input type="file" multiple onChange={(e) => setEditAssignmentFiles(Array.from(e.target.files || []))} className={inputCls} />
                         <div className="flex gap-2">
                           <button onClick={handleUpdateAssignment} disabled={savingAssignmentEdit} className="rounded-lg bg-brand-500 px-3 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-60">
                             {savingAssignmentEdit ? 'Salvando...' : 'Salvar edição'}
@@ -587,7 +608,11 @@ export default function TeacherClassDetail({ apiBase = '/teacher' }: TeacherClas
                             <p className="font-medium text-blue-700 dark:text-blue-400">{assignment.title}</p>
                             <p className="text-xs text-gray-600 dark:text-gray-400">Entrega: {new Date(assignment.dueDate).toLocaleDateString('pt-BR')}</p>
                           </div>
-                          <span className={`rounded-full px-2 py-1 text-xs font-medium ${assignment.completion?.allCompleted ? 'bg-blue-500 text-green-700 dark:bg-green-900/40 dark:text-green-500' : 'bg-blue-700 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'}`}>
+                          <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                            assignment.completion?.allCompleted
+                              ? 'bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400'
+                              : 'bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300'
+                          }`}>
                             {assignment.completion?.allCompleted ? 'Concluída por todos' : `${assignment.completion?.completedCount || 0}/${assignment.completion?.totalStudents || 0} concluíram`}
                           </span>
                         </div>
@@ -654,15 +679,15 @@ export default function TeacherClassDetail({ apiBase = '/teacher' }: TeacherClas
 
           <form onSubmit={handleCreateAssignment} className="space-y-3 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Nova Atividade</h2>
-            <input required value={newAssignment.title} onChange={(e) => setNewAssignment((prev) => ({ ...prev, title: e.target.value }))} placeholder="Título" className={inputBlueClass} />
-            <input required type="date" value={newAssignment.dueDate} onChange={(e) => setNewAssignment((prev) => ({ ...prev, dueDate: e.target.value }))} className={inputBlueClass} />
-            <select value={newAssignment.type} onChange={(e) => setNewAssignment((prev) => ({ ...prev, type: e.target.value }))} className={inputBlueClass}>
+            <input required value={newAssignment.title} onChange={(e) => setNewAssignment((prev) => ({ ...prev, title: e.target.value }))} placeholder="Título" className={inputCls} />
+            <input required type="date" value={newAssignment.dueDate} onChange={(e) => setNewAssignment((prev) => ({ ...prev, dueDate: e.target.value }))} className={inputCls} />
+            <select value={newAssignment.type} onChange={(e) => setNewAssignment((prev) => ({ ...prev, type: e.target.value }))} className={inputCls}>
               <option value="WORK">WORK</option>
               <option value="EXAM">EXAM</option>
             </select>
-            <input type="number" min="0" value={newAssignment.maxScore} onChange={(e) => setNewAssignment((prev) => ({ ...prev, maxScore: e.target.value }))} placeholder="Nota máxima (opcional)" className={inputBlueClass} />
-            <textarea value={newAssignment.description} onChange={(e) => setNewAssignment((prev) => ({ ...prev, description: e.target.value }))} placeholder="Descrição (opcional)" rows={4} className={inputBlueClass} />
-            <input type="file" multiple onChange={(e) => setNewAssignmentFiles(Array.from(e.target.files || []))} className={inputBlueClass} />
+            <input type="number" min="0" value={newAssignment.maxScore} onChange={(e) => setNewAssignment((prev) => ({ ...prev, maxScore: e.target.value }))} placeholder="Nota máxima (opcional)" className={inputCls} />
+            <textarea value={newAssignment.description} onChange={(e) => setNewAssignment((prev) => ({ ...prev, description: e.target.value }))} placeholder="Descrição (opcional)" rows={4} className={inputCls} />
+            <input type="file" multiple onChange={(e) => setNewAssignmentFiles(Array.from(e.target.files || []))} className={inputCls} />
             <button type="submit" disabled={savingAssignment} className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-60">
               {savingAssignment ? 'Salvando...' : 'Criar atividade'}
             </button>
@@ -688,13 +713,13 @@ export default function TeacherClassDetail({ apiBase = '/teacher' }: TeacherClas
                   <tr key={student.id} className="border-b border-gray-100 last:border-0 dark:border-gray-800">
                     <td className="px-3 py-2 text-gray-900 dark:text-white">{student.fullName}</td>
                     <td className="px-3 py-2">
-                      <input type="number" min="0" max="10" value={noteDrafts[student.id]?.note1 ?? ''} onChange={(e) => setNoteDrafts((prev) => ({ ...prev, [student.id]: { ...(prev[student.id] || { note1: '', note2: '', note3: '' }), note1: e.target.value } }))} className="w-20 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-blue-700 placeholder:text-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-blue-400 dark:placeholder:text-blue-500" />
+                      <input type="number" min="0" max="10" value={noteDrafts[student.id]?.note1 ?? ''} onChange={(e) => setNoteDrafts((prev) => ({ ...prev, [student.id]: { ...(prev[student.id] || { note1: '', note2: '', note3: '' }), note1: e.target.value } }))} className="w-20 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-800 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-500/30" />
                     </td>
                     <td className="px-3 py-2">
-                      <input type="number" min="0" max="10" value={noteDrafts[student.id]?.note2 ?? ''} onChange={(e) => setNoteDrafts((prev) => ({ ...prev, [student.id]: { ...(prev[student.id] || { note1: '', note2: '', note3: '' }), note2: e.target.value } }))} className="w-20 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-blue-700 placeholder:text-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-blue-400 dark:placeholder:text-blue-500" />
+                      <input type="number" min="0" max="10" value={noteDrafts[student.id]?.note2 ?? ''} onChange={(e) => setNoteDrafts((prev) => ({ ...prev, [student.id]: { ...(prev[student.id] || { note1: '', note2: '', note3: '' }), note2: e.target.value } }))} className="w-20 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-800 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-500/30" />
                     </td>
                     <td className="px-3 py-2">
-                      <input type="number" min="0" max="10" value={noteDrafts[student.id]?.note3 ?? ''} onChange={(e) => setNoteDrafts((prev) => ({ ...prev, [student.id]: { ...(prev[student.id] || { note1: '', note2: '', note3: '' }), note3: e.target.value } }))} className="w-20 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-blue-700 placeholder:text-blue-400 dark:border-gray-700 dark:bg-gray-950 dark:text-blue-400 dark:placeholder:text-blue-500" />
+                      <input type="number" min="0" max="10" value={noteDrafts[student.id]?.note3 ?? ''} onChange={(e) => setNoteDrafts((prev) => ({ ...prev, [student.id]: { ...(prev[student.id] || { note1: '', note2: '', note3: '' }), note3: e.target.value } }))} className="w-20 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-800 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-500/30" />
                     </td>
                     <td className="px-3 py-2 text-gray-700 dark:text-gray-300">{student.average ?? '-'}</td>
                   </tr>
@@ -798,7 +823,7 @@ export default function TeacherClassDetail({ apiBase = '/teacher' }: TeacherClas
                     <div>
                       <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Plano de aula *</label>
                       <select value={linkTemplateId} onChange={e => setLinkTemplateId(e.target.value)}
-                        className={`mt-1 ${inputBlueClass}`}>
+                        className={`mt-1 ${inputCls}`}>
                         <option value="">Selecione um plano...</option>
                         {templates.map(t => (
                           <option key={t.id} value={t.id}>{t.title}</option>
@@ -813,7 +838,7 @@ export default function TeacherClassDetail({ apiBase = '/teacher' }: TeacherClas
                     <div>
                       <label className="text-xs font-medium text-gray-600 dark:text-gray-400">Data da aula *</label>
                       <input type="date" value={linkDate} onChange={e => setLinkDate(e.target.value)}
-                        className={`mt-1 ${inputBlueClass}`} />
+                        className={`mt-1 ${inputCls}`} />
                     </div>
                     <button onClick={handleLinkPlan} disabled={savingLink}
                       className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-60">

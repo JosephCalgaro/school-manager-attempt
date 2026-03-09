@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { LuSearch, LuX, LuPlus } from 'react-icons/lu';
+import { LuSearch, LuX, LuPlus, LuPowerOff, LuPower } from 'react-icons/lu';
 import { useAuth } from '../../hooks/useAuth';
 
 interface User {
@@ -136,10 +136,12 @@ export default function AdminUsers() {
   const [loading, setLoading]   = useState(true);
   const [search, setSearch]     = useState('');
   const [roleFilter, setRoleFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
   const [page, setPage]         = useState(0);
   const [total, setTotal]       = useState(0);
   const [limit]                 = useState(10);
   const [modal, setModal]       = useState<null | 'new' | UserDetails>(null);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -148,6 +150,7 @@ export default function AdminUsers() {
         limit: limit.toString(), offset: (page * limit).toString(),
         ...(search     && { search }),
         ...(roleFilter && { role: roleFilter }),
+        ...(statusFilter !== 'all' && { status: statusFilter }),
       });
       const res = await authFetch(`/admin/users?${params}`);
       if (!res.ok) throw new Error();
@@ -155,13 +158,21 @@ export default function AdminUsers() {
       setUsers(data.data); setTotal(data.total);
     } catch { /* silent */ }
     finally { setLoading(false); }
-  }, [search, roleFilter, page, limit, authFetch]);
+  }, [search, roleFilter, statusFilter, page, limit, authFetch]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
   const openEdit = async (userId: number) => {
     const res = await authFetch(`/admin/users/${userId}`);
     if (res.ok) setModal(await res.json());
+  };
+
+  const handleToggle = async (u: User) => {
+    setTogglingId(u.id)
+    try {
+      await authFetch(`/admin/users/${u.id}/toggle`, { method: 'PATCH' })
+      await fetchUsers()
+    } finally { setTogglingId(null) }
   };
 
   const totalPages = Math.ceil(total / limit);
@@ -179,7 +190,7 @@ export default function AdminUsers() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="relative">
           <LuSearch className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
           <input value={search} onChange={e => { setSearch(e.target.value); setPage(0); }}
@@ -191,6 +202,16 @@ export default function AdminUsers() {
           <option value="">Todos os Papéis</option>
           {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
         </select>
+        <div className="flex items-center gap-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-1">
+          {(['active', 'inactive', 'all'] as const).map(s => (
+            <button key={s} onClick={() => { setStatusFilter(s); setPage(0); }}
+              className={`flex-1 rounded-md py-1.5 text-xs font-medium transition-colors ${
+                statusFilter === s ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}>
+              {s === 'active' ? 'Ativos' : s === 'inactive' ? 'Inativos' : 'Todos'}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
@@ -204,8 +225,7 @@ export default function AdminUsers() {
               <table className="w-full">
                 <thead className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
                   <tr>
-                    {['Nome','Email','Telefone','Função','Status','Ações'].map(h => (
-                      <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">{h}</th>
+                    {['Nome','Email','Telefone','Função','Status','Ações'].map(h => (                      <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -222,7 +242,16 @@ export default function AdminUsers() {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm">
-                        <button onClick={() => openEdit(u.id)} className="text-brand-600 dark:text-brand-400 hover:underline font-medium">Editar</button>
+                        <div className="flex items-center gap-3">
+                          <button onClick={() => openEdit(u.id)} className="text-brand-600 dark:text-brand-400 hover:underline font-medium">Editar</button>
+                          <button onClick={() => handleToggle(u)} disabled={togglingId === u.id}
+                            title={u.is_active ? 'Desativar' : 'Reativar'}
+                            className={`flex items-center gap-1 text-sm font-medium disabled:opacity-50 transition-colors ${
+                              u.is_active ? 'text-error-600 hover:text-error-700 dark:text-error-400' : 'text-success-600 hover:text-success-700 dark:text-success-400'
+                            }`}>
+                            {u.is_active ? <><LuPowerOff className="h-3.5 w-3.5" /> Desativar</> : <><LuPower className="h-3.5 w-3.5" /> Reativar</>}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

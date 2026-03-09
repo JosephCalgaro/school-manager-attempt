@@ -3,13 +3,14 @@ import {
   getAllStudents, getStudentDetails, createStudent, updateStudentDetails,
   getStudentClasses, getStudentAttendance, getStudentAssignments,
   getSecretaryStats,
-  getAllClasses, createClass, updateClass,
+  getAllClasses, createClass, updateClass, toggleClassActive,
   getClassStudentsList, addStudentToClass, removeStudentFromClass,
+  toggleStudentActive,
 } from '../controllers/adminController.js'
 import {
   getAllResponsibles, getResponsibleById,
   createResponsible, updateResponsible, deleteResponsible,
-  getStudentsByResponsibleId,
+  getStudentsByResponsibleId, toggleResponsibleActive,
 } from '../controllers/responsiblesController.js'
 
 const router = Router()
@@ -25,20 +26,22 @@ const isSecretary = (req, res, next) => {
 router.use(isSecretary)
 
 router.get('/stats',             getSecretaryStats)
-router.get('/students',          getAllStudents)
-router.get('/students/:id',      getStudentDetails)
-router.post('/students',         createStudent)
-router.put('/students/:id',      updateStudentDetails)
-router.get('/students/:id/classes',     getStudentClasses)
-router.get('/students/:id/attendance',  getStudentAttendance)
-router.get('/students/:id/assignments', getStudentAssignments)
+router.get('/students',                     getAllStudents)
+router.get('/students/:id',                 getStudentDetails)
+router.post('/students',                    createStudent)
+router.put('/students/:id',                 updateStudentDetails)
+router.patch('/students/:id/toggle',        toggleStudentActive)
+router.get('/students/:id/classes',         getStudentClasses)
+router.get('/students/:id/attendance',      getStudentAttendance)
+router.get('/students/:id/assignments',     getStudentAssignments)
 
 // Turmas
-router.get('/classes',                          getAllClasses)
-router.post('/classes',                         createClass)
-router.put('/classes/:id',                      updateClass)
-router.get('/classes/:id/students',             getClassStudentsList)
-router.post('/classes/:id/students',            addStudentToClass)
+router.get('/classes',                            getAllClasses)
+router.post('/classes',                           createClass)
+router.put('/classes/:id',                        updateClass)
+router.patch('/classes/:id/toggle',               toggleClassActive)
+router.get('/classes/:id/students',               getClassStudentsList)
+router.post('/classes/:id/students',              addStudentToClass)
 router.delete('/classes/:id/students/:studentId', removeStudentFromClass)
 
 // Responsáveis
@@ -47,6 +50,7 @@ router.get('/responsibles/:id',                getResponsibleById)
 router.post('/responsibles',                   createResponsible)
 router.put('/responsibles/:id',                updateResponsible)
 router.delete('/responsibles/:id',             deleteResponsible)
+router.patch('/responsibles/:id/toggle',       toggleResponsibleActive)
 router.get('/responsibles/:id/students',       getStudentsByResponsibleId)
 
 export default router

@@ -177,11 +177,11 @@ async function saveAssignmentFiles(assignmentId, files) {
 async function getAccessibleClass(classId, userId, userRole) {
   const isAdmin = isAdminRole(userRole)
   const query = isAdmin
-    ? `SELECT c.id, c.name, c.schedule, c.teacher_id, u.full_name AS teacher_name
+    ? `SELECT c.id, c.name, c.schedule, c.classroom, c.teacher_id, u.full_name AS teacher_name
        FROM classes c
        JOIN users u ON u.id = c.teacher_id
        WHERE c.id = ?`
-    : `SELECT c.id, c.name, c.schedule, c.teacher_id, u.full_name AS teacher_name
+    : `SELECT c.id, c.name, c.schedule, c.classroom, c.teacher_id, u.full_name AS teacher_name
        FROM classes c
        JOIN users u ON u.id = c.teacher_id
        WHERE c.id = ? AND c.teacher_id = ?`
@@ -207,13 +207,14 @@ async function getGradesColumns() {
 
 async function getTeacherClassesWithStats(teacherId, userRole) {
   const isAdmin = isAdminRole(userRole)
-  const whereClause = isAdmin ? '' : 'WHERE c.teacher_id = ?'
+  const whereClause = isAdmin ? 'WHERE c.is_active = 1' : 'WHERE c.teacher_id = ? AND c.is_active = 1'
   const params = isAdmin ? [] : [teacherId]
   const [rows] = await pool.query(
     `SELECT
       c.id,
       c.name,
       c.schedule,
+      c.classroom,
       COALESCE(cs.total_students, 0) AS totalStudents,
       COALESCE(att.attendance_rate, 0) AS attendanceRate,
       COALESCE(ass.total_assignments, 0) AS totalAssignments

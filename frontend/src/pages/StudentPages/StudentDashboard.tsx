@@ -11,6 +11,8 @@ import {
   LuFileText,
   LuCircleCheckBig,
   LuClipboardList,
+  LuDownload,
+  LuDoorOpen,
 } from 'react-icons/lu'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -20,6 +22,7 @@ interface StudentClass {
   id: number
   name: string
   schedule: string | null
+  classroom: string | null
   teacher_name: string
 }
 
@@ -42,12 +45,14 @@ interface ClassAssignment {
   due_date: string
   description: string | null
   score: number | null
+  files?: { id: number; originalName: string; url: string }[]
 }
 
 interface ClassDetails {
   id: number
   name: string
   schedule: string | null
+  classroom: string | null
   teacher_name: string
   teacher_email: string | null
   assignments: ClassAssignment[]
@@ -155,6 +160,9 @@ function ClassCard({
                 </span>
               )}
               <span className="flex items-center gap-1">
+                <LuDoorOpen className="h-3 w-3" /> {cls.classroom ?? 'Sem sala'}
+              </span>
+              <span className="flex items-center gap-1">
                 <LuUser className="h-3 w-3" /> {cls.teacher_name}
               </span>
             </div>
@@ -199,13 +207,23 @@ function ClassCard({
                       key={a.id}
                       className="flex items-start justify-between gap-3 rounded-lg bg-gray-50 dark:bg-gray-900 px-3 py-2.5"
                     >
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-gray-800 dark:text-white truncate">{a.title}</p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                           {TYPE_LABEL[a.type] ?? a.type} · Entrega: {formatDate(a.due_date)}
                         </p>
                         {a.description && (
                           <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 line-clamp-2">{a.description}</p>
+                        )}
+                        {a.files && a.files.length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap gap-1.5">
+                            {a.files.map(f => (
+                              <a key={f.id} href={f.url} target="_blank" rel="noreferrer"
+                                className="inline-flex items-center gap-1 rounded-md border border-brand-200 bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700 hover:bg-brand-100 dark:border-brand-800 dark:bg-brand-900/20 dark:text-brand-400">
+                                <LuDownload className="h-3 w-3" /> {f.originalName}
+                              </a>
+                            ))}
+                          </div>
                         )}
                       </div>
                       <DueBadge days={daysUntil(a.due_date)} score={a.score} maxScore={a.max_score} />

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { LuSearch, LuX, LuPlus, LuUserPlus, LuEye } from 'react-icons/lu'
+import { LuSearch, LuX, LuPlus, LuUserPlus, LuEye, LuPowerOff, LuPower } from 'react-icons/lu'
 import { useAuth } from '../../hooks/useAuth'
 
 interface Student {
   id: number; full_name: string; cpf: string; email: string
-  phone?: string | null; birth_date: string; created_at: string
+  phone?: string | null; birth_date: string; created_at: string; is_active: number
 }
 interface Responsible {
   full_name: string; cpf: string; rg: string; birth_date: string
@@ -320,6 +320,8 @@ export default function SecretaryStudents() {
   const [limit] = useState(10)
   const [modal, setModal] = useState<null | 'new' | { id: number; form: StudentForm }>(null)
   const [detailsId, setDetailsId] = useState<number | null>(null)
+  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active')
+  const [togglingId, setTogglingId] = useState<number | null>(null)
 
   const fetchStudents = useCallback(async () => {
     try {
@@ -327,6 +329,7 @@ export default function SecretaryStudents() {
       const params = new URLSearchParams({
         limit: limit.toString(), offset: (page * limit).toString(),
         ...(search && { search }),
+        ...(statusFilter !== 'all' && { status: statusFilter }),
       })
       const res = await authFetch(`/secretary/students?${params}`)
       if (!res.ok) throw new Error()
@@ -334,9 +337,17 @@ export default function SecretaryStudents() {
       setStudents(data.data); setTotal(data.total)
     } catch { /* handled silently */ }
     finally { setLoading(false) }
-  }, [search, page, limit, authFetch])
+  }, [search, statusFilter, page, limit, authFetch])
 
   useEffect(() => { fetchStudents() }, [fetchStudents])
+
+  const handleToggle = async (s: Student) => {
+    setTogglingId(s.id)
+    try {
+      await authFetch(`/secretary/students/${s.id}/toggle`, { method: 'PATCH' })
+      await fetchStudents()
+    } finally { setTogglingId(null) }
+  }
 
   const openEdit = async (id: number) => {
     const res = await authFetch(`/secretary/students/${id}`)
@@ -373,11 +384,23 @@ export default function SecretaryStudents() {
         </button>
       </div>
 
-      <div className="relative">
-        <LuSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input value={search} onChange={e => { setSearch(e.target.value); setPage(0) }}
-          placeholder="Buscar por nome, email ou CPF..."
-          className="h-11 w-full rounded-xl border border-gray-300 bg-white pl-10 pr-4 text-sm outline-none focus:ring-2 ring-brand-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white" />
+      <div className="flex flex-wrap gap-3">
+        <div className="relative flex-1 min-w-48">
+          <LuSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input value={search} onChange={e => { setSearch(e.target.value); setPage(0) }}
+            placeholder="Buscar por nome, email ou CPF..."
+            className="h-11 w-full rounded-xl border border-gray-300 bg-white pl-10 pr-4 text-sm outline-none focus:ring-2 ring-brand-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white" />
+        </div>
+        <div className="flex items-center gap-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-1">
+          {(['active', 'inactive', 'all'] as const).map(s => (
+            <button key={s} onClick={() => { setStatusFilter(s); setPage(0); }}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                statusFilter === s ? 'bg-brand-500 text-white' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+              }`}>
+              {s === 'active' ? 'Ativos' : s === 'inactive' ? 'Inativos' : 'Todos'}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 overflow-hidden shadow-sm">
@@ -391,7 +414,7 @@ export default function SecretaryStudents() {
               <table className="w-full text-sm">
                 <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-700">
                   <tr>
-                    {['Nome', 'Email', 'Telefone', 'CPF', 'Ações'].map(h => (
+                    {['Nome', 'Status', 'Email', 'Telefone', 'CPF', 'Ações'].map(h => (
                       <th key={h} className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-gray-300">{h}</th>
                     ))}
                   </tr>
@@ -400,6 +423,14 @@ export default function SecretaryStudents() {
                   {students.map(s => (
                     <tr key={s.id} className="hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
                       <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{s.full_name}</td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                          s.is_active ? 'bg-success-50 text-success-700 dark:bg-success-900/20 dark:text-success-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                        }`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${s.is_active ? 'bg-success-500' : 'bg-gray-400'}`} />
+                          {s.is_active ? 'Ativo' : 'Inativo'}
+                        </span>
+                      </td>
                       <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{s.email}</td>
                       <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{s.phone || '-'}</td>
                       <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{s.cpf}</td>
@@ -410,6 +441,12 @@ export default function SecretaryStudents() {
                             <LuEye className="h-4 w-4" /> Ver
                           </button>
                           <button onClick={() => openEdit(s.id)} className="text-brand-600 dark:text-brand-400 hover:underline font-medium text-sm">Editar</button>
+                          <button onClick={() => handleToggle(s)} disabled={togglingId === s.id}
+                            className={`flex items-center gap-1 text-sm font-medium disabled:opacity-50 ${
+                              s.is_active ? 'text-error-600 hover:text-error-700 dark:text-error-400' : 'text-success-600 hover:text-success-700 dark:text-success-400'
+                            }`}>
+                            {s.is_active ? <><LuPowerOff className="h-3.5 w-3.5" /> Desativar</> : <><LuPower className="h-3.5 w-3.5" /> Reativar</>}
+                          </button>
                         </div>
                       </td>
                     </tr>

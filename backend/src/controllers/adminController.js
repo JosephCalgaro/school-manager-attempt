@@ -1,6 +1,17 @@
 import bcrypt from 'bcryptjs';
 import pool from '../database/connection.js';
 
+// ─── Migration helper ─────────────────────────────────────────────────────────
+async function ensureIsActive(tableName) {
+  try {
+    await pool.query(`ALTER TABLE \`${tableName}\` ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1`)
+  } catch (e) {
+    if (e.code !== 'ER_DUP_FIELDNAME') throw e
+  }
+}
+// keep old name for backward compat
+async function ensureClassIsActive() { return ensureIsActive('classes') }
+
 // ============ CONTADORES ============
 export const getStats = async (req, res) => {
   try {
@@ -19,27 +30,23 @@ export const getStats = async (req, res) => {
 // ============ ALUNOS ============
 export const getAllStudents = async (req, res) => {
   try {
-    const { search, limit = 10, offset = 0 } = req.query;
-    let query = 'SELECT id, full_name, cpf, email, phone, birth_date, created_at FROM students';
-    let params = [];
+    const { search, status, limit = 10, offset = 0 } = req.query;
+    const conditions = []
+    const params = []
 
     if (search) {
-      query += ' WHERE full_name LIKE ? OR email LIKE ? OR cpf LIKE ?';
-      const searchTerm = `%${search}%`;
-      params = [searchTerm, searchTerm, searchTerm];
+      conditions.push('(full_name LIKE ? OR email LIKE ? OR cpf LIKE ?)')
+      const t = `%${search}%`; params.push(t, t, t)
     }
+    if (status === 'active')   conditions.push('is_active = 1')
+    if (status === 'inactive') conditions.push('is_active = 0')
 
-    query += ' LIMIT ? OFFSET ?';
-    params.push(parseInt(limit), parseInt(offset));
+    const where = conditions.length ? ' WHERE ' + conditions.join(' AND ') : ''
+    const query = `SELECT id, full_name, cpf, email, phone, birth_date, is_active, created_at FROM students${where} ORDER BY is_active DESC, full_name LIMIT ? OFFSET ?`
+    const [students] = await pool.query(query, [...params, parseInt(limit), parseInt(offset)])
 
-    const [students] = await pool.query(query, params);
-    let countQuery = 'SELECT COUNT(*) as total FROM students';
-    let countParams = [];
-    if (search) {
-      countQuery += ' WHERE full_name LIKE ? OR email LIKE ? OR cpf LIKE ?';
-      countParams = [ `%${search}%`, `%${search}%`, `%${search}%` ];
-    }
-    const [countResult] = await pool.query(countQuery, countParams);
+    const countQ = `SELECT COUNT(*) as total FROM students${where}`
+    const [countResult] = await pool.query(countQ, params)
 
     res.json({ data: students, total: countResult[0].total, limit: parseInt(limit), offset: parseInt(offset) });
   } catch (error) {
@@ -47,6 +54,20 @@ export const getAllStudents = async (req, res) => {
     res.status(500).json({ message: 'Erro ao listar alunos' });
   }
 };
+
+export const toggleStudentActive = async (req, res) => {
+  const { id } = req.params
+  try {
+    const [[s]] = await pool.query('SELECT is_active FROM students WHERE id = ?', [id])
+    if (!s) return res.status(404).json({ message: 'Aluno não encontrado' })
+    const newStatus = s.is_active ? 0 : 1
+    await pool.query('UPDATE students SET is_active = ? WHERE id = ?', [newStatus, id])
+    res.json({ is_active: newStatus, message: newStatus ? 'Aluno reativado' : 'Aluno desativado' })
+  } catch (error) {
+    console.error('Erro ao alterar status do aluno:', error)
+    res.status(500).json({ message: 'Erro ao alterar status do aluno' })
+  }
+}
 
 export const getStudentDetails = async (req, res) => {
   try {
@@ -234,8 +255,8 @@ export const createStudent = async (req, res) => {
     }
 
     const [result] = await conn.query(
-      `INSERT INTO students (full_name, cpf, rg, birth_date, address, email, phone, due_day, password_hash, responsible_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO students (full_name, cpf, rg, birth_date, address, email, phone, due_day, password_hash, responsible_id, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
       [
         full_name,
         String(cpf).replace(/\D/g, ''),
@@ -267,24 +288,37 @@ export const createStudent = async (req, res) => {
 // ============ USUÁRIOS ============
 export const getAllUsers = async (req, res) => {
   try {
-    const { search, role, limit = 10, offset = 0 } = req.query;
-    let query = 'SELECT id, full_name, email, phone, role, is_active, created_at FROM users';
+    const { search, role, status, limit = 10, offset = 0 } = req.query;
     let params = [];
     let conditions = [];
     if (search) { conditions.push('(full_name LIKE ? OR email LIKE ?)'); params.push(`%${search}%`, `%${search}%`); }
-    if (role) { conditions.push('role = ?'); params.push(role); }
-    if (conditions.length > 0) query += ' WHERE ' + conditions.join(' AND ');
-    query += ' LIMIT ? OFFSET ?';
+    if (role)   { conditions.push('role = ?'); params.push(role); }
+    if (status === 'active')   conditions.push('is_active = 1')
+    if (status === 'inactive') conditions.push('is_active = 0')
+    const where = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : ''
+    const query = `SELECT id, full_name, email, phone, role, is_active, created_at FROM users${where} ORDER BY is_active DESC, full_name LIMIT ? OFFSET ?`
     params.push(parseInt(limit), parseInt(offset));
     const [users] = await pool.query(query, params);
-    let countQuery = 'SELECT COUNT(*) as total FROM users';
-    if (conditions.length > 0) countQuery += ' WHERE ' + conditions.join(' AND ');
-    const [countResult] = await pool.query(countQuery, params.slice(0, -2));
+    const [countResult] = await pool.query(`SELECT COUNT(*) as total FROM users${where}`, params.slice(0, -2));
     res.json({ data: users, total: countResult[0].total, limit: parseInt(limit), offset: parseInt(offset) });
   } catch (error) {
     res.status(500).json({ message: 'Erro ao listar usuários' });
   }
 };
+
+export const toggleUserActive = async (req, res) => {
+  const { id } = req.params
+  try {
+    const [[u]] = await pool.query('SELECT is_active FROM users WHERE id = ?', [id])
+    if (!u) return res.status(404).json({ message: 'Usuário não encontrado' })
+    const newStatus = u.is_active ? 0 : 1
+    await pool.query('UPDATE users SET is_active = ? WHERE id = ?', [newStatus, id])
+    res.json({ is_active: newStatus, message: newStatus ? 'Usuário reativado' : 'Usuário desativado' })
+  } catch (error) {
+    console.error('Erro ao alterar status do usuário:', error)
+    res.status(500).json({ message: 'Erro ao alterar status do usuário' })
+  }
+}
 
 export const getUserDetails = async (req, res) => {
   try {
@@ -387,21 +421,23 @@ export const getSecretaryStats = async (req, res) => {
 // ============ TURMAS (secretary / admin) ============
 export const getAllClasses = async (req, res) => {
   try {
-    const { search } = req.query
+    await ensureClassIsActive()
+    const { search, status } = req.query   // status: 'active' | 'inactive' | undefined (= all)
     let query = `
-      SELECT c.id, c.name, c.schedule,
+      SELECT c.id, c.name, c.schedule, c.classroom, c.is_active,
              u.full_name AS teacher_name,
              COUNT(cs.student_id) AS total_students
       FROM classes c
       LEFT JOIN users u ON u.id = c.teacher_id
       LEFT JOIN class_students cs ON cs.class_id = c.id
     `
+    const conditions = []
     const params = []
-    if (search) {
-      query += ' WHERE c.name LIKE ?'
-      params.push(`%${search}%`)
-    }
-    query += ' GROUP BY c.id ORDER BY c.name'
+    if (search)           { conditions.push('c.name LIKE ?');   params.push(`%${search}%`) }
+    if (status === 'active')   conditions.push('c.is_active = 1')
+    if (status === 'inactive') conditions.push('c.is_active = 0')
+    if (conditions.length) query += ' WHERE ' + conditions.join(' AND ')
+    query += ' GROUP BY c.id ORDER BY c.is_active DESC, c.name'
     const [classes] = await pool.query(query, params)
     res.json(classes)
   } catch (error) {
@@ -411,12 +447,13 @@ export const getAllClasses = async (req, res) => {
 }
 
 export const createClass = async (req, res) => {
-  const { name, schedule, teacher_id } = req.body || {}
+  const { name, schedule, teacher_id, classroom } = req.body || {}
   if (!name) return res.status(400).json({ message: 'Nome da turma é obrigatório' })
   try {
+    await ensureClassIsActive()
     const [result] = await pool.query(
-      'INSERT INTO classes (name, schedule, teacher_id) VALUES (?, ?, ?)',
-      [name, schedule || null, teacher_id || null]
+      'INSERT INTO classes (name, schedule, teacher_id, classroom, is_active) VALUES (?, ?, ?, ?, 1)',
+      [name, schedule || null, teacher_id || null, classroom || null]
     )
     res.status(201).json({ id: result.insertId, message: 'Turma criada com sucesso' })
   } catch (error) {
@@ -427,18 +464,36 @@ export const createClass = async (req, res) => {
 
 export const updateClass = async (req, res) => {
   const { id } = req.params
-  const { name, schedule, teacher_id } = req.body || {}
+  const { name, schedule, teacher_id, classroom, is_active } = req.body || {}
   const fields = []; const values = []
-  if (name      !== undefined) { fields.push('name = ?');       values.push(name) }
-  if (schedule  !== undefined) { fields.push('schedule = ?');   values.push(schedule || null) }
+  if (name       !== undefined) { fields.push('name = ?');       values.push(name) }
+  if (schedule   !== undefined) { fields.push('schedule = ?');   values.push(schedule || null) }
   if (teacher_id !== undefined) { fields.push('teacher_id = ?'); values.push(teacher_id || null) }
+  if (classroom  !== undefined) { fields.push('classroom = ?');  values.push(classroom || null) }
+  if (is_active  !== undefined) { fields.push('is_active = ?');  values.push(is_active ? 1 : 0) }
   if (!fields.length) return res.status(400).json({ message: 'Nenhum campo para atualizar' })
   try {
+    await ensureClassIsActive()
     await pool.query(`UPDATE classes SET ${fields.join(', ')} WHERE id = ?`, [...values, id])
     res.json({ message: 'Turma atualizada com sucesso' })
   } catch (error) {
     console.error('Erro ao atualizar turma:', error)
     res.status(500).json({ message: 'Erro ao atualizar turma' })
+  }
+}
+
+export const toggleClassActive = async (req, res) => {
+  const { id } = req.params
+  try {
+    await ensureClassIsActive()
+    const [[cls]] = await pool.query('SELECT is_active FROM classes WHERE id = ?', [id])
+    if (!cls) return res.status(404).json({ message: 'Turma não encontrada' })
+    const newStatus = cls.is_active ? 0 : 1
+    await pool.query('UPDATE classes SET is_active = ? WHERE id = ?', [newStatus, id])
+    res.json({ is_active: newStatus, message: newStatus ? 'Turma reativada' : 'Turma desativada' })
+  } catch (error) {
+    console.error('Erro ao alterar status da turma:', error)
+    res.status(500).json({ message: 'Erro ao alterar status da turma' })
   }
 }
 

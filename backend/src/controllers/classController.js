@@ -16,7 +16,7 @@ export async function createClass(req, res) {
 
     // cria a turma
     const [result] = await conn.query(
-      'INSERT INTO classes (name, teacher_id, schedule) VALUES (?, ?, ?)',
+      'INSERT INTO classes (name, teacher_id, schedule, classroom) VALUES (?, ?, ?, ?)',
       [name, teacherId, schedule]
     )
     const classId = result.insertId
@@ -48,7 +48,7 @@ export async function createClass(req, res) {
 export async function getClasses(req, res) {
   try {
     const [rows] = await pool.query(
-      `SELECT c.id, c.name, c.schedule, c.teacher_id,
+      `SELECT c.id, c.name, c.schedule, c.classroom, c.teacher_id,
               u.full_name AS teacher_name
       FROM classes c
       JOIN users u ON c.teacher_id = u.id
@@ -67,7 +67,7 @@ export async function getClassById(req, res) {
   try {
     // busca a turma com dados do professor
     const [classRows] = await pool.query(
-      `SELECT c.id, c.name, c.schedule, c.teacher_id,
+      `SELECT c.id, c.name, c.schedule, c.classroom, c.teacher_id,
               u.full_name AS teacher_name, u.email AS teacher_email
       FROM classes c
       JOIN users u ON c.teacher_id = u.id
@@ -97,7 +97,7 @@ export async function getClassById(req, res) {
 // PUT /classes/:id - atualizar turma
 export async function updateClass(req, res) {
   const classId = req.params.id
-  const { name, teacherId, schedule, students } = req.body
+  const { name, teacherId, schedule, classroom, students } = req.body
   const conn = await pool.getConnection()
 
   try {
@@ -116,6 +116,7 @@ export async function updateClass(req, res) {
     if (name) { fields.push('name = ?'); values.push(name) }
     if (teacherId) { fields.push('teacher_id = ?'); values.push(teacherId) }
     if (schedule) { fields.push('schedule = ?'); values.push(schedule) }
+    if (classroom) { fields.push('classroom = ?'); values.push(classroom) }
 
     if (fields.length > 0) {
       await conn.query(

@@ -5,25 +5,41 @@ import { validateResponsiblePayload, validateResponsibleUpdatePayload } from '..
 // GET /responsibles  (paginado)
 export async function getAllResponsibles(req, res) {
   try {
-    const { search, limit = 10, offset = 0 } = req.query
-    let query = 'SELECT id, full_name, cpf, rg, birth_date, address, email, phone, created_at FROM responsibles'
-    let count = 'SELECT COUNT(*) AS total FROM responsibles'
-    const params = []
+    const { search, status, limit = 10, offset = 0 } = req.query
+    const conditions = []; const params = []
 
     if (search) {
       const term = `%${search}%`
-      const where = ' WHERE full_name LIKE ? OR email LIKE ? OR cpf LIKE ?'
-      query += where; count += where
+      conditions.push('(full_name LIKE ? OR email LIKE ? OR cpf LIKE ?)')
       params.push(term, term, term)
     }
+    if (status === 'active')   conditions.push('is_active = 1')
+    if (status === 'inactive') conditions.push('is_active = 0')
 
-    query += ' ORDER BY full_name LIMIT ? OFFSET ?'
-    const [rows]   = await pool.query(query,  [...params, Number(limit), Number(offset)])
-    const [totals] = await pool.query(count,  params)
+    const where = conditions.length ? ' WHERE ' + conditions.join(' AND ') : ''
+    const query = `SELECT id, full_name, cpf, rg, birth_date, address, email, phone, is_active, created_at FROM responsibles${where} ORDER BY is_active DESC, full_name LIMIT ? OFFSET ?`
+    const count = `SELECT COUNT(*) AS total FROM responsibles${where}`
+
+    const [rows]   = await pool.query(query, [...params, Number(limit), Number(offset)])
+    const [totals] = await pool.query(count, params)
     res.json({ data: rows, total: totals[0].total })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Erro ao listar responsáveis' })
+  }
+}
+
+// PATCH /responsibles/:id/toggle
+export async function toggleResponsibleActive(req, res) {
+  try {
+    const [[r]] = await pool.query('SELECT is_active FROM responsibles WHERE id = ?', [req.params.id])
+    if (!r) return res.status(404).json({ error: 'Responsável não encontrado' })
+    const newStatus = r.is_active ? 0 : 1
+    await pool.query('UPDATE responsibles SET is_active = ? WHERE id = ?', [newStatus, req.params.id])
+    res.json({ is_active: newStatus, message: newStatus ? 'Responsável reativado' : 'Responsável desativado' })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Erro ao alterar status do responsável' })
   }
 }
 
