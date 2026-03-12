@@ -1052,15 +1052,41 @@ async function ensureLessonPlanTables() {
   // Biblioteca de templates (por professor)
   await pool.query(`
     CREATE TABLE IF NOT EXISTS lesson_plan_templates (
-      id          INT AUTO_INCREMENT PRIMARY KEY,
-      teacher_id  INT NOT NULL,
-      title       VARCHAR(255) NOT NULL,
-      description TEXT NULL,
-      created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      id                 INT AUTO_INCREMENT PRIMARY KEY,
+      teacher_id         INT NOT NULL,
+      title              VARCHAR(255) NOT NULL,
+      description        TEXT NULL,
+      warm_up            TEXT NULL,
+      ice_breaker        TEXT NULL,
+      development        TEXT NULL,
+      language_awareness TEXT NULL,
+      closure            TEXT NULL,
+      created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_lpt_teacher (teacher_id)
     )
   `)
+
+  // Migração incremental: adicionar colunas de seção se não existirem
+  const sectionCols = [
+    'warm_up TEXT NULL',
+    'ice_breaker TEXT NULL',
+    'development TEXT NULL',
+    'language_awareness TEXT NULL',
+    'closure TEXT NULL',
+    'custom_sections TEXT NULL',
+  ]
+  for (const colDef of sectionCols) {
+    const colName = colDef.split(' ')[0]
+    const [existing] = await pool.query(
+      `SELECT 1 FROM information_schema.columns
+       WHERE table_schema = DATABASE() AND table_name = 'lesson_plan_templates' AND column_name = ? LIMIT 1`,
+      [colName]
+    )
+    if (existing.length === 0) {
+      await pool.query(`ALTER TABLE lesson_plan_templates ADD COLUMN ${colDef}`)
+    }
+  }
 
   // Instâncias vinculadas a turmas
   await pool.query(`
@@ -1090,12 +1116,17 @@ export async function getMyTemplates(req, res) {
     const teacherId = isAdminRole(req.userRole) ? null : req.userId
     const [rows] = teacherId
       ? await pool.query(
-          `SELECT id, teacher_id, title, description, created_at, updated_at
+          `SELECT id, teacher_id, title, description,
+                  warm_up, ice_breaker, development, language_awareness, closure,
+                  custom_sections, created_at, updated_at
            FROM lesson_plan_templates WHERE teacher_id = ? ORDER BY title`,
           [teacherId]
         )
       : await pool.query(
-          `SELECT t.id, t.teacher_id, u.full_name AS teacher_name, t.title, t.description, t.created_at
+          `SELECT t.id, t.teacher_id, u.full_name AS teacher_name,
+                  t.title, t.description,
+                  t.warm_up, t.ice_breaker, t.development, t.language_awareness, t.closure,
+                  t.custom_sections, t.created_at, t.updated_at
            FROM lesson_plan_templates t
            LEFT JOIN users u ON u.id = t.teacher_id
            ORDER BY u.full_name, t.title`
@@ -1109,14 +1140,19 @@ export async function getMyTemplates(req, res) {
 
 // POST /teacher/lesson-plans
 export async function createTemplate(req, res) {
-  const { title, description } = req.body || {}
+  const { title, description, warm_up, ice_breaker, development, language_awareness, closure, custom_sections } = req.body || {}
   if (!title || String(title).trim() === '')
     return res.status(400).json({ error: 'Título é obrigatório' })
   try {
     await ensureLessonPlanTables()
     const [result] = await pool.query(
-      `INSERT INTO lesson_plan_templates (teacher_id, title, description) VALUES (?, ?, ?)`,
-      [req.userId, String(title).trim(), description || null]
+      `INSERT INTO lesson_plan_templates
+         (teacher_id, title, description, warm_up, ice_breaker, development, language_awareness, closure, custom_sections)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.userId, String(title).trim(),
+        description || null, warm_up || null, ice_breaker || null,
+        development || null, language_awareness || null, closure || null,
+        custom_sections ? JSON.stringify(custom_sections) : null]
     )
     const [rows] = await pool.query('SELECT * FROM lesson_plan_templates WHERE id = ?', [result.insertId])
     res.status(201).json(rows[0])
@@ -1129,7 +1165,7 @@ export async function createTemplate(req, res) {
 // PUT /teacher/lesson-plans/:templateId
 export async function updateTemplate(req, res) {
   const templateId = Number(req.params.templateId)
-  const { title, description } = req.body || {}
+  const { title, description, warm_up, ice_breaker, development, language_awareness, closure, custom_sections } = req.body || {}
   if (!Number.isInteger(templateId)) return res.status(400).json({ error: 'ID inválido' })
   try {
     await ensureLessonPlanTables()
@@ -1142,8 +1178,14 @@ export async function updateTemplate(req, res) {
     if (existing.length === 0) return res.status(404).json({ error: 'Template não encontrado' })
 
     const fields = []; const values = []
-    if (title !== undefined)       { fields.push('title = ?');       values.push(String(title).trim()) }
-    if (description !== undefined) { fields.push('description = ?'); values.push(description || null) }
+    if (title              !== undefined) { fields.push('title = ?');              values.push(String(title).trim()) }
+    if (description        !== undefined) { fields.push('description = ?');        values.push(description || null) }
+    if (warm_up            !== undefined) { fields.push('warm_up = ?');            values.push(warm_up || null) }
+    if (ice_breaker        !== undefined) { fields.push('ice_breaker = ?');        values.push(ice_breaker || null) }
+    if (development        !== undefined) { fields.push('development = ?');        values.push(development || null) }
+    if (language_awareness !== undefined) { fields.push('language_awareness = ?'); values.push(language_awareness || null) }
+    if (closure            !== undefined) { fields.push('closure = ?');            values.push(closure || null) }
+    if (custom_sections    !== undefined) { fields.push('custom_sections = ?');    values.push(custom_sections ? JSON.stringify(custom_sections) : null) }
     if (fields.length === 0) return res.status(400).json({ error: 'Nenhum campo para atualizar' })
 
     await pool.query(`UPDATE lesson_plan_templates SET ${fields.join(', ')} WHERE id = ?`, [...values, templateId])
@@ -1187,7 +1229,9 @@ export async function getLessonPlans(req, res) {
     const [rows] = await pool.query(
       `SELECT clp.id, clp.template_id, clp.class_id, clp.planned_date,
               clp.status, clp.completion_notes, clp.created_at,
-              t.title, t.description
+              t.title, t.description,
+              t.custom_sections,
+              t.warm_up, t.ice_breaker, t.development, t.language_awareness, t.closure
        FROM class_lesson_plans clp
        JOIN lesson_plan_templates t ON t.id = clp.template_id
        WHERE clp.class_id = ?

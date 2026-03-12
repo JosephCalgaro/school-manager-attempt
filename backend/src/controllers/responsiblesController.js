@@ -1,6 +1,5 @@
 import pool from '../database/connection.js'
 import bcrypt from 'bcryptjs'
-import { validateResponsiblePayload, validateResponsibleUpdatePayload } from '../utils/validator.js'
 
 // GET /responsibles  (paginado)
 export async function getAllResponsibles(req, res) {

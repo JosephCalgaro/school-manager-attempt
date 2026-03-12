@@ -1,93 +1,97 @@
-import express from 'express';
-const router = express.Router();
-import * as adminController from '../controllers/adminController.js';
+import express from 'express'
+import * as adminController from '../controllers/adminController.js'
 import {
   getAllResponsibles, getResponsibleById,
   createResponsible, updateResponsible, deleteResponsible,
   getStudentsByResponsibleId, toggleResponsibleActive,
 } from '../controllers/responsiblesController.js'
 import {
-  createClassAssignment,
-  deleteClassAssignment,
-  getTeacherClassById,
-  getTeacherClasses,
-  registerClassAttendance,
-  upsertAssignmentCompletions,
-  upsertStudentNotes,
-  updateClassAssignment,
-  getMyTemplates,
-  createTemplate,
-  updateTemplate,
-  deleteTemplate,
-  getLessonPlans,
-  createLessonPlan,
-  updateLessonPlan,
-  deleteLessonPlan,
-} from '../controllers/teacherController.js';
-import { authenticate } from '../middlewares/auth.js';
+  createClassAssignment, deleteClassAssignment,
+  getTeacherClassById, getTeacherClasses,
+  registerClassAttendance, upsertAssignmentCompletions,
+  upsertStudentNotes, updateClassAssignment,
+  getMyTemplates, createTemplate, updateTemplate, deleteTemplate,
+  getLessonPlans, createLessonPlan, updateLessonPlan, deleteLessonPlan,
+} from '../controllers/teacherController.js'
+import {
+  getLeads, createLead, updateLead, deleteLead,
+  getActivities, createActivity, toggleActivity, archiveEnrolled, archiveLost,
+} from '../controllers/crmController.js'
 
-// Middleware para verificar se é admin
+const router = express.Router()
+
+// Nota: authenticate já é aplicado no app.js antes deste router.
+// Este middleware garante apenas que o role seja ADMIN.
 const isAdmin = (req, res, next) => {
   if (req.userRole !== 'ADMIN') {
-    return res.status(403).json({ message: 'Acesso negado. Apenas administradores.' });
+    return res.status(403).json({ message: 'Acesso negado. Apenas administradores.' })
   }
-  next();
-};
+  next()
+}
+
+router.use(isAdmin)
 
 // Contadores
-router.get('/stats', authenticate, isAdmin, adminController.getStats);
+router.get('/stats', adminController.getStats)
 
-// Listagem de Alunos
-router.get('/students',                 authenticate, isAdmin, adminController.getAllStudents);
-router.post('/students',                authenticate, isAdmin, adminController.createStudent);
-router.get('/students/:id',             authenticate, isAdmin, adminController.getStudentDetails);
-router.put('/students/:id',             authenticate, isAdmin, adminController.updateStudentDetails);
-router.patch('/students/:id/toggle',    authenticate, isAdmin, adminController.toggleStudentActive);
+// Alunos
+router.get('/students',                 adminController.getAllStudents)
+router.post('/students',                adminController.createStudent)
+router.get('/students/:id',             adminController.getStudentDetails)
+router.put('/students/:id',             adminController.updateStudentDetails)
+router.patch('/students/:id/toggle',    adminController.toggleStudentActive)
+router.get('/students/:id/classes',     adminController.getStudentClasses)
+router.get('/students/:id/attendance',  adminController.getStudentAttendance)
+router.get('/students/:id/assignments', adminController.getStudentAssignments)
 
-// Listagem de Usuários
-router.get('/users',                    authenticate, isAdmin, adminController.getAllUsers);
-router.get('/users/:id',                authenticate, isAdmin, adminController.getUserDetails);
-router.post('/users',                   authenticate, isAdmin, adminController.createUser);
-router.put('/users/:id',                authenticate, isAdmin, adminController.updateUser);
-router.patch('/users/:id/toggle',       authenticate, isAdmin, adminController.toggleUserActive);
+// Usuários
+router.get('/users',              adminController.getAllUsers)
+router.get('/users/:id',          adminController.getUserDetails)
+router.post('/users',             adminController.createUser)
+router.put('/users/:id',          adminController.updateUser)
+router.patch('/users/:id/toggle', adminController.toggleUserActive)
 
-// Turmas de um aluno
-router.get('/students/:id/classes', authenticate, isAdmin, adminController.getStudentClasses);
-
-// Frequência de um aluno
-router.get('/students/:id/attendance', authenticate, isAdmin, adminController.getStudentAttendance);
-
-// Atividades e notas de um aluno
-router.get('/students/:id/assignments', authenticate, isAdmin, adminController.getStudentAssignments);
-
-// Gestão de turmas/atividades/notas no painel admin
-router.get('/classes', authenticate, isAdmin, getTeacherClasses);
-router.get('/classes/:id', authenticate, isAdmin, getTeacherClassById);
-router.patch('/classes/:id/toggle', authenticate, isAdmin, adminController.toggleClassActive);
-router.post('/classes/:id/attendance', authenticate, isAdmin, registerClassAttendance);
-router.post('/classes/:id/notes', authenticate, isAdmin, upsertStudentNotes);
-router.post('/classes/:id/assignments', authenticate, isAdmin, createClassAssignment);
-router.put('/classes/:id/assignments/:assignmentId', authenticate, isAdmin, updateClassAssignment);
-router.post('/classes/:id/assignments/:assignmentId/completions', authenticate, isAdmin, upsertAssignmentCompletions);
-router.delete('/classes/:id/assignments/:assignmentId', authenticate, isAdmin, deleteClassAssignment);
+// Turmas
+router.get('/classes',                                            getTeacherClasses)
+router.post('/classes',                                           adminController.createClass)
+router.get('/classes/:id',                                        getTeacherClassById)
+router.put('/classes/:id',                                        adminController.updateClass)
+router.patch('/classes/:id/toggle',                               adminController.toggleClassActive)
+router.post('/classes/:id/attendance',                            registerClassAttendance)
+router.post('/classes/:id/notes',                                 upsertStudentNotes)
+router.post('/classes/:id/assignments',                           createClassAssignment)
+router.put('/classes/:id/assignments/:assignmentId',              updateClassAssignment)
+router.post('/classes/:id/assignments/:assignmentId/completions', upsertAssignmentCompletions)
+router.delete('/classes/:id/assignments/:assignmentId',           deleteClassAssignment)
 
 // Responsáveis
-router.get('/responsibles',              authenticate, isAdmin, getAllResponsibles)
-router.get('/responsibles/:id',          authenticate, isAdmin, getResponsibleById)
-router.post('/responsibles',             authenticate, isAdmin, createResponsible)
-router.put('/responsibles/:id',          authenticate, isAdmin, updateResponsible)
-router.delete('/responsibles/:id',       authenticate, isAdmin, deleteResponsible)
-router.patch('/responsibles/:id/toggle', authenticate, isAdmin, toggleResponsibleActive)
-router.get('/responsibles/:id/students', authenticate, isAdmin, getStudentsByResponsibleId)
+router.get('/responsibles',               getAllResponsibles)
+router.get('/responsibles/:id',           getResponsibleById)
+router.post('/responsibles',              createResponsible)
+router.put('/responsibles/:id',           updateResponsible)
+router.delete('/responsibles/:id',        deleteResponsible)
+router.patch('/responsibles/:id/toggle',  toggleResponsibleActive)
+router.get('/responsibles/:id/students',  getStudentsByResponsibleId)
 
-// Planejamento de aula (admin)
-router.get('/lesson-plans',               authenticate, isAdmin, getMyTemplates)
-router.post('/lesson-plans',              authenticate, isAdmin, createTemplate)
-router.put('/lesson-plans/:templateId',   authenticate, isAdmin, updateTemplate)
-router.delete('/lesson-plans/:templateId',authenticate, isAdmin, deleteTemplate)
-router.get('/classes/:id/lesson-plans',            authenticate, isAdmin, getLessonPlans)
-router.post('/classes/:id/lesson-plans',           authenticate, isAdmin, createLessonPlan)
-router.put('/classes/:id/lesson-plans/:planId',    authenticate, isAdmin, updateLessonPlan)
-router.delete('/classes/:id/lesson-plans/:planId', authenticate, isAdmin, deleteLessonPlan)
+// Planejamento de aula
+router.get('/lesson-plans',                        getMyTemplates)
+router.post('/lesson-plans',                       createTemplate)
+router.put('/lesson-plans/:templateId',            updateTemplate)
+router.delete('/lesson-plans/:templateId',         deleteTemplate)
+router.get('/classes/:id/lesson-plans',            getLessonPlans)
+router.post('/classes/:id/lesson-plans',           createLessonPlan)
+router.put('/classes/:id/lesson-plans/:planId',    updateLessonPlan)
+router.delete('/classes/:id/lesson-plans/:planId', deleteLessonPlan)
 
-export default router;
+// CRM
+router.get('/crm/leads',                      getLeads)
+router.post('/crm/leads',                     createLead)
+router.put('/crm/leads/:id',                  updateLead)
+router.delete('/crm/leads/:id',               deleteLead)
+router.get('/crm/leads/:id/activities',       getActivities)
+router.post('/crm/leads/:id/activities',      createActivity)
+router.patch('/crm/activities/:actId/toggle', toggleActivity)
+router.post('/crm/archive-enrolled',          archiveEnrolled)
+router.post('/crm/archive-lost',              archiveLost)
+
+export default router

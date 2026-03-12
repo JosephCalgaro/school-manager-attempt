@@ -1,16 +1,7 @@
 import bcrypt from 'bcryptjs';
 import pool from '../database/connection.js';
 
-// ─── Migration helper ─────────────────────────────────────────────────────────
-async function ensureIsActive(tableName) {
-  try {
-    await pool.query(`ALTER TABLE \`${tableName}\` ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1`)
-  } catch (e) {
-    if (e.code !== 'ER_DUP_FIELDNAME') throw e
-  }
-}
-// keep old name for backward compat
-async function ensureClassIsActive() { return ensureIsActive('classes') }
+// (is_active columns are ensured at startup by migrations.js)
 
 // ============ CONTADORES ============
 export const getStats = async (req, res) => {
@@ -421,12 +412,11 @@ export const getSecretaryStats = async (req, res) => {
 // ============ TURMAS (secretary / admin) ============
 export const getAllClasses = async (req, res) => {
   try {
-    await ensureClassIsActive()
     const { search, status } = req.query   // status: 'active' | 'inactive' | undefined (= all)
     let query = `
       SELECT c.id, c.name, c.schedule, c.classroom, c.is_active,
-             u.full_name AS teacher_name,
-             COUNT(cs.student_id) AS total_students
+          u.full_name AS teacher_name,
+          COUNT(cs.student_id) AS total_students
       FROM classes c
       LEFT JOIN users u ON u.id = c.teacher_id
       LEFT JOIN class_students cs ON cs.class_id = c.id
@@ -447,45 +437,72 @@ export const getAllClasses = async (req, res) => {
 }
 
 export const createClass = async (req, res) => {
-  const { name, schedule, teacher_id, classroom } = req.body || {}
+  const { name, schedule, teacher_id, classroom, students } = req.body || {}
   if (!name) return res.status(400).json({ message: 'Nome da turma é obrigatório' })
+  const conn = await pool.getConnection()
   try {
-    await ensureClassIsActive()
-    const [result] = await pool.query(
+    await conn.beginTransaction()
+    const [result] = await conn.query(
       'INSERT INTO classes (name, schedule, teacher_id, classroom, is_active) VALUES (?, ?, ?, ?, 1)',
       [name, schedule || null, teacher_id || null, classroom || null]
     )
-    res.status(201).json({ id: result.insertId, message: 'Turma criada com sucesso' })
+    const classId = result.insertId
+    if (Array.isArray(students) && students.length > 0) {
+      const rows = students.map(sid => [classId, sid])
+      await conn.query('INSERT IGNORE INTO class_students (class_id, student_id) VALUES ?', [rows])
+    }
+    await conn.commit()
+    res.status(201).json({ id: classId, message: 'Turma criada com sucesso' })
   } catch (error) {
+    await conn.rollback()
     console.error('Erro ao criar turma:', error)
     res.status(500).json({ message: 'Erro ao criar turma' })
+  } finally {
+    conn.release()
   }
 }
 
 export const updateClass = async (req, res) => {
   const { id } = req.params
-  const { name, schedule, teacher_id, classroom, is_active } = req.body || {}
-  const fields = []; const values = []
-  if (name       !== undefined) { fields.push('name = ?');       values.push(name) }
-  if (schedule   !== undefined) { fields.push('schedule = ?');   values.push(schedule || null) }
-  if (teacher_id !== undefined) { fields.push('teacher_id = ?'); values.push(teacher_id || null) }
-  if (classroom  !== undefined) { fields.push('classroom = ?');  values.push(classroom || null) }
-  if (is_active  !== undefined) { fields.push('is_active = ?');  values.push(is_active ? 1 : 0) }
-  if (!fields.length) return res.status(400).json({ message: 'Nenhum campo para atualizar' })
+  const { name, schedule, teacher_id, classroom, is_active, students } = req.body || {}
+  const conn = await pool.getConnection()
   try {
-    await ensureClassIsActive()
-    await pool.query(`UPDATE classes SET ${fields.join(', ')} WHERE id = ?`, [...values, id])
+    await conn.beginTransaction()
+
+    // Atualiza campos da turma se houver algum
+    const fields = []; const values = []
+    if (name       !== undefined) { fields.push('name = ?');       values.push(name) }
+    if (schedule   !== undefined) { fields.push('schedule = ?');   values.push(schedule || null) }
+    if (teacher_id !== undefined) { fields.push('teacher_id = ?'); values.push(teacher_id || null) }
+    if (classroom  !== undefined) { fields.push('classroom = ?');  values.push(classroom || null) }
+    if (is_active  !== undefined) { fields.push('is_active = ?');  values.push(is_active ? 1 : 0) }
+    if (fields.length > 0) {
+      await conn.query(`UPDATE classes SET ${fields.join(', ')} WHERE id = ?`, [...values, id])
+    }
+
+    // Sincroniza alunos se o array foi enviado
+    if (Array.isArray(students)) {
+      await conn.query('DELETE FROM class_students WHERE class_id = ?', [id])
+      if (students.length > 0) {
+        const rows = students.map(sid => [id, sid])
+        await conn.query('INSERT IGNORE INTO class_students (class_id, student_id) VALUES ?', [rows])
+      }
+    }
+
+    await conn.commit()
     res.json({ message: 'Turma atualizada com sucesso' })
   } catch (error) {
+    await conn.rollback()
     console.error('Erro ao atualizar turma:', error)
     res.status(500).json({ message: 'Erro ao atualizar turma' })
+  } finally {
+    conn.release()
   }
 }
 
 export const toggleClassActive = async (req, res) => {
   const { id } = req.params
   try {
-    await ensureClassIsActive()
     const [[cls]] = await pool.query('SELECT is_active FROM classes WHERE id = ?', [id])
     if (!cls) return res.status(404).json({ message: 'Turma não encontrada' })
     const newStatus = cls.is_active ? 0 : 1
@@ -502,10 +519,10 @@ export const getClassStudentsList = async (req, res) => {
   try {
     const [students] = await pool.query(
       `SELECT s.id, s.full_name, s.email, s.cpf
-       FROM students s
-       JOIN class_students cs ON cs.student_id = s.id
-       WHERE cs.class_id = ?
-       ORDER BY s.full_name`,
+      FROM students s
+      JOIN class_students cs ON cs.student_id = s.id
+      WHERE cs.class_id = ?
+      ORDER BY s.full_name`,
       [id]
     )
     res.json(students)

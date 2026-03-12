@@ -22,8 +22,11 @@ import SecretaryStudents from "./pages/SecretaryPages/SecretaryStudents";
 import SecretaryHome from "./pages/SecretaryPages/SecretaryHome";
 import SecretaryClasses from "./pages/SecretaryPages/SecretaryClasses";
 import SecretaryResponsibles from "./pages/SecretaryPages/SecretaryResponsibles";
+import SecretaryCRM from "./pages/SecretaryPages/SecretaryCRM";
 import StudentDashboard from "./pages/StudentPages/StudentDashboard";
 import ResponsibleDashboard from "./pages/ResponsiblePages/ResponsibleDashboard";
+
+
 
 // Redireciona alunos para /student, demais usuários ficam no Home padrão
 function HomeRedirect() {
@@ -66,12 +69,14 @@ export default function App() {
             <Route path="/admin/classes" element={<AdminClasses />} />
             <Route path="/admin/classes/:id" element={<AdminClassDetail />} />
             <Route path="/admin/responsibles" element={<SecretaryResponsibles apiBase="/admin" />} />
+            <Route path="/admin/crm" element={<SecretaryCRM apiBase="/admin" />} />
 
             {/* Secretary */}
             <Route path="/secretary" element={<SecretaryHome />} />
             <Route path="/secretary/students" element={<SecretaryStudents />} />
             <Route path="/secretary/classes" element={<SecretaryClasses />} />
             <Route path="/secretary/responsibles" element={<SecretaryResponsibles />} />
+            <Route path="/secretary/crm" element={<SecretaryCRM />} />
 
             {/* Teacher */}
             <Route path="/teacher" element={<TeacherDashboard />} />

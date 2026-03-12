@@ -335,7 +335,7 @@ Create `.env` inside `backend`:
     DB_PASSWORD=password
     DB_NAME=school_manager
     JWT_SECRET=secret
-    PORT=3000
+    PORT=3333
 
 ------------------------------------------------------------------------
 

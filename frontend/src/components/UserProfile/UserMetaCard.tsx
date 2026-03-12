@@ -4,9 +4,11 @@ export default function UserMetaCard() {
   const { user } = useAuth();
 
   const roleLabels: Record<string, string> = {
-    admin: "Administrador",
-    teacher: "Professor",
-    responsible: "Responsável",
+    ADMIN:       "Administrador",
+    TEACHER:     "Professor",
+    SECRETARY:   "Secretaria",
+    STUDENT:     "Aluno",
+    RESPONSIBLE: "Responsável",
   };
 
   return (

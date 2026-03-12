@@ -73,7 +73,7 @@ export default function Home() {
       }
     }
     load()
-  }, [user])
+  }, [user, authFetch])
 
   const detailBase = isAdmin ? '/admin/classes' : '/teacher/classes'
 

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import {
   LuBookOpen, LuClock3, LuSearch, LuUsers,
-  LuPlus, LuPencil, LuTrash2, LuX, LuCheck, LuChevronDown
+  LuPlus, LuPencil, LuX, LuCheck, LuChevronDown,
+  LuPowerOff, LuPower
 } from 'react-icons/lu'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -14,6 +15,7 @@ type TeacherClass = {
   schedule: string | null
   classroom: string | null
   totalStudents: number
+  is_active?: number
 }
 
 type Student = { id: number; full_name: string; email: string }
@@ -226,6 +228,7 @@ function TeacherSelect({
 function ClassModal({
   editing,
   isAdmin,
+  apiBase,
   currentUserId,
   onClose,
   onSaved,
@@ -233,6 +236,7 @@ function ClassModal({
 }: {
   editing: TeacherClass | null
   isAdmin: boolean
+  apiBase: string
   currentUserId: number
   onClose: () => void
   onSaved: () => void
@@ -255,26 +259,32 @@ function ClassModal({
     const load = async () => {
       try {
         setLoadingData(true)
-        // Load all students
-        const sRes = await authFetch('/students')
-        if (sRes.ok) setStudents(await sRes.json())
 
-        // Load teachers (admin only)
+        // Busca todos os alunos ativos (resposta paginada: { data: [...] })
+        const sRes = await authFetch(`${apiBase}/students?limit=500&status=active`)
+        if (sRes.ok) {
+          const sData = await sRes.json()
+          setStudents(Array.isArray(sData) ? sData : (sData.data ?? []))
+        }
+
+        // Busca professores (apenas admin)
         if (isAdmin) {
-          const uRes = await authFetch('/users')
+          const uRes = await authFetch(`${apiBase}/users?role=TEACHER&limit=100`)
           if (uRes.ok) {
-            const users: { id: number; name: string; email: string; role: string }[] = await uRes.json()
+            const uData = await uRes.json()
+            const userList: { id: number; full_name: string; email: string; role: string }[] =
+              Array.isArray(uData) ? uData : (uData.data ?? [])
             setTeachers(
-              users
+              userList
                 .filter((u) => u.role === 'TEACHER')
-                .map((u) => ({ id: u.id, full_name: u.name ?? '', email: u.email }))
+                .map((u) => ({ id: u.id, full_name: u.full_name ?? '', email: u.email }))
             )
           }
         }
 
-        // If editing, load current students of this class
+        // Se editando, carrega alunos atuais da turma
         if (editing) {
-          const cRes = await authFetch(`/classes/${editing.id}`)
+          const cRes = await authFetch(`${apiBase}/classes/${editing.id}`)
           if (cRes.ok) {
             const data = await cRes.json()
             setForm((prev) => ({
@@ -294,25 +304,26 @@ function ClassModal({
     }
     load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editing?.id, isAdmin])
+  }, [editing?.id, isAdmin, apiBase])
 
   const submit = async () => {
     if (!form.name.trim()) return setError('Nome da turma é obrigatório')
-    if (!form.teacherId) return setError('Selecione um professor')
+    if (isAdmin && !form.teacherId) return setError('Selecione um professor')
     if (form.students.length === 0) return setError('Adicione pelo menos um aluno')
 
     setSaving(true)
     setError(null)
     try {
+      // Payload alinhado com adminController.createClass / updateClass
       const payload = {
         name: form.name.trim(),
-        teacherId: Number(form.teacherId),
+        teacher_id: form.teacherId ? Number(form.teacherId) : undefined,
         schedule: form.schedule.trim() || null,
         classroom: form.classroom.trim() || null,
         students: form.students,
       }
 
-      const url = editing ? `/classes/${editing.id}` : '/classes'
+      const url    = editing ? `${apiBase}/classes/${editing.id}` : `${apiBase}/classes`
       const method = editing ? 'PUT' : 'POST'
 
       const res = await authFetch(url, {
@@ -323,7 +334,7 @@ function ClassModal({
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        throw new Error(err?.error || err?.errors?.[0] || 'Erro ao salvar turma')
+        throw new Error(err?.message || err?.error || err?.errors?.[0] || 'Erro ao salvar turma')
       }
 
       onSaved()
@@ -464,7 +475,7 @@ export default function TeacherDashboard({
 
   const [modalOpen, setModalOpen] = useState(false)
   const [editingClass, setEditingClass] = useState<TeacherClass | null>(null)
-  const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [togglingId, setTogglingId] = useState<number | null>(null)
 
   const fetchClasses = useCallback(async () => {
     try {
@@ -493,17 +504,21 @@ export default function TeacherDashboard({
     fetchClasses()
   }, [user, fetchClasses, navigate])
 
-  const deleteClass = async (id: number) => {
-    if (!confirm('Tem certeza que deseja remover esta turma? Esta ação é irreversível.')) return
-    setDeletingId(id)
+  const toggleClass = async (cls: TeacherClass & { is_active?: number }) => {
+    const isActive = cls.is_active !== 0
+    const msg = isActive
+      ? 'Desativar esta turma? Ela ficará oculta para professores e alunos.'
+      : 'Reativar esta turma?'
+    if (!confirm(msg)) return
+    setTogglingId(cls.id)
     try {
-      const res = await authFetch(`/classes/${id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Erro ao remover turma')
+      const res = await authFetch(`${apiBase}/classes/${cls.id}/toggle`, { method: 'PATCH' })
+      if (!res.ok) throw new Error('Erro ao alterar status da turma')
       await fetchClasses()
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Erro ao remover turma')
+      alert(e instanceof Error ? e.message : 'Erro ao alterar status da turma')
     } finally {
-      setDeletingId(null)
+      setTogglingId(null)
     }
   }
 
@@ -535,13 +550,15 @@ export default function TeacherDashboard({
             {classes.length} turma{classes.length !== 1 ? 's' : ''} cadastrada{classes.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <button
-          onClick={() => { setEditingClass(null); setModalOpen(true) }}
-          className="flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 transition-colors"
-        >
-          <LuPlus className="h-4 w-4" />
-          Nova Turma
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => { setEditingClass(null); setModalOpen(true) }}
+            className="flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 transition-colors"
+          >
+            <LuPlus className="h-4 w-4" />
+            Nova Turma
+          </button>
+        )}
       </div>
 
       {/* Search */}
@@ -562,7 +579,7 @@ export default function TeacherDashboard({
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {search ? 'Nenhuma turma encontrada para essa busca.' : 'Nenhuma turma cadastrada ainda.'}
           </p>
-          {!search && (
+          {!search && isAdmin && (
             <button
               onClick={() => { setEditingClass(null); setModalOpen(true) }}
               className="mt-3 text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"
@@ -578,8 +595,9 @@ export default function TeacherDashboard({
               key={cls.id}
               className="group relative rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900 hover:border-brand-300 hover:shadow-md dark:hover:border-brand-700 transition"
             >
-              {/* Action buttons */}
-              <div className="absolute right-3 top-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {/* Action buttons — admin only */}
+              {isAdmin && (
+                <div className="absolute right-3 top-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
                   onClick={(e) => { e.stopPropagation(); setEditingClass(cls); setModalOpen(true) }}
                   className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-300"
@@ -588,14 +606,22 @@ export default function TeacherDashboard({
                   <LuPencil className="h-3.5 w-3.5" />
                 </button>
                 <button
-                  onClick={(e) => { e.stopPropagation(); deleteClass(cls.id) }}
-                  disabled={deletingId === cls.id}
-                  className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
-                  title="Remover turma"
+                  onClick={(e) => { e.stopPropagation(); toggleClass(cls) }}
+                  disabled={togglingId === cls.id}
+                  className={`rounded-lg p-1.5 disabled:opacity-50 transition-colors ${
+                    cls.is_active !== 0
+                      ? 'text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400'
+                      : 'text-gray-400 hover:bg-green-50 hover:text-green-600 dark:hover:bg-green-900/30 dark:hover:text-green-400'
+                  }`}
+                  title={cls.is_active !== 0 ? 'Desativar turma' : 'Reativar turma'}
                 >
-                  <LuTrash2 className="h-3.5 w-3.5" />
+                  {cls.is_active !== 0
+                    ? <LuPowerOff className="h-3.5 w-3.5" />
+                    : <LuPower className="h-3.5 w-3.5" />
+                  }
                 </button>
               </div>
+              )}
 
               {/* Card content — clickable */}
               <button
@@ -640,6 +666,7 @@ export default function TeacherDashboard({
         <ClassModal
           editing={editingClass}
           isAdmin={isAdmin}
+          apiBase={apiBase}
           currentUserId={user?.id ?? 0}
           onClose={() => setModalOpen(false)}
           onSaved={() => { setModalOpen(false); fetchClasses() }}

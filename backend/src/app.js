@@ -1,118 +1,43 @@
-// Importa o framework Express (servidor HTTP)
 import express from 'express'
 import path from 'path'
-
-// Importa o CORS (permite que o frontend acesse a API)
 import cors from 'cors'
 
-// Importa o pool de conexão com o MySQL
 import pool from './database/connection.js'
 import { ensureContactColumns } from './database/migrations.js'
-
-// Importa autenticação de token JWT
 import { authenticate } from './middlewares/auth.js'
 
-// Importa rotas de alunos
-import studentRoutes from './routes/studentRoutes.js'
-
-// Importa rotas de usuários
-import userRoutes from './routes/userRoutes.js'
-
-// Importa rotas de autenticação de login
 import authRoutes from './routes/authRoutes.js'
-
-// Importa rotas de turmas
-import classRoutes from './routes/classRoutes.js'
-
-// Importa rotas de responsáveis
-import responsiblesRoutes from './routes/responsiblesRoutes.js'
-
-// Importa rotas de tarefas
-import assignmentRoutes from './routes/assignmentRoutes.js'
-
-// Importa rotas administrativas
 import adminRoutes from './routes/adminRoutes.js'
-
-// Importa rotas da área do aluno (self-service)
-import studentSelfRoutes from './routes/studentSelfRoutes.js'
-
-// Importa rotas do professor
 import teacherRoutes from './routes/teacherRoutes.js'
 import secretaryRoutes from './routes/secretaryRoutes.js'
+import studentSelfRoutes from './routes/studentSelfRoutes.js'
 import responsibleSelfRoutes from './routes/resposibleSelfRoutes.js'
 
-// Cria a aplicação Express
 const app = express()
 
-// Habilita CORS para permitir requisições externas (React, etc.)
 app.use(cors())
-
-// Permite que a API receba JSON no body das requisições
-// limite maior para suportar anexos (base64) em atividades
 app.use(express.json({ limit: '25mb' }))
-
-// Expõe arquivos de anexos das atividades
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')))
 
-// Garante colunas de contato no schema
 ensureContactColumns().catch((error) => {
-  console.error('Erro ao aplicar migrações de contato:', error)
+  console.error('Erro ao aplicar migrações:', error)
 })
 
-// Protege e monta as rotas de alunos /students
-app.use('/students', authenticate, studentRoutes)
-
-// Protege e monta as rotas de usuários /users
-app.use('/users', authenticate, userRoutes)
-
-// Protege e monta as rotas de turmas /classes
-app.use('/classes', authenticate, classRoutes)
-
-// Protege e monta as rotas de tarefas /assignments
-app.use('/assignments', authenticate, assignmentRoutes)
-
-// Protege e monta as rotas de responsáveis /responsibles
-app.use('/responsibles', authenticate, responsiblesRoutes)
-
-// Protege e monta as rotas administrativas /admin
-app.use('/admin', authenticate, adminRoutes)
-
-// Monta as rotas da área do aluno /student
-app.use('/student', studentSelfRoutes)
-
-// Protege e monta as rotas do professor /teacher
-app.use('/teacher', authenticate, teacherRoutes)
-app.use('/secretary', authenticate, secretaryRoutes)
+app.use('/auth',       authRoutes)
+app.use('/admin',      authenticate, adminRoutes)
+app.use('/teacher',    authenticate, teacherRoutes)
+app.use('/secretary',  authenticate, secretaryRoutes)
+app.use('/student',    studentSelfRoutes)
 app.use('/responsible', responsibleSelfRoutes)
 
-// Monta as rotas de autenticação no caminho /auth
-app.use('/auth', authRoutes)
-
-// Rota de teste da API
-// Usada para verificar se:
-// 1) O servidor está rodando
-// 2) O MySQL está conectado
 app.get('/ping', async (req, res) => {
-try {
-    // Executa uma query simples no banco
-    // "SELECT 1" não acessa nenhuma tabela, só testa a conexão
-    const [rows] = await pool.query('SELECT 1')
-
-    // Se chegou aqui, o banco está conectado
-    res.json({
-    message: 'API funcionando',
-    database: 'MySQL conectado com sucesso 🚀'
-    })
-} catch (error) {
-    // Se ocorrer qualquer erro, ele cai aqui
+  try {
+    await pool.query('SELECT 1')
+    res.json({ message: 'API funcionando', database: 'MySQL conectado com sucesso 🚀' })
+  } catch (error) {
     console.error(error)
-
-    // Retorna erro 500 (erro interno do servidor)
-    res.status(500).json({
-    error: 'Erro ao conectar no banco de dados'
-    })
-}
+    res.status(500).json({ error: 'Erro ao conectar no banco de dados' })
+  }
 })
 
-// Exporta o app para ser usado pelo server.js
 export default app

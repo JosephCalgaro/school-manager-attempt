@@ -93,16 +93,74 @@ export async function login(req, res) {
 }
 
 // GET /auth/profile
+// Retorna dados completos do usuário logado, independente da tabela de origem.
 export async function getProfile(req, res) {
+  const role = (req.userRole || '').toUpperCase()
+
   try {
+    // Aluno
+    if (role === 'STUDENT') {
+      const [rows] = await pool.query(
+        `SELECT s.id, s.full_name AS fullName, s.email, s.phone, s.cpf, s.rg,
+                s.birth_date AS birthDate, s.address, s.due_day AS dueDay,
+                'STUDENT' AS role,
+                r.full_name AS responsibleName,
+                r.email     AS responsibleEmail,
+                r.phone     AS responsiblePhone
+         FROM students s
+         LEFT JOIN responsibles r ON s.responsible_id = r.id
+         WHERE s.id = ?`,
+        [req.userId]
+      )
+      if (rows.length === 0) return res.status(404).json({ error: 'Aluno não encontrado' })
+      return res.json(rows[0])
+    }
+
+    // Responsável
+    if (role === 'RESPONSIBLE') {
+      const [rows] = await pool.query(
+        `SELECT r.id, r.full_name AS fullName, r.email, r.phone, r.cpf, r.rg,
+                r.birth_date AS birthDate, r.address,
+                'RESPONSIBLE' AS role,
+                s.id         AS studentId,
+                s.full_name  AS studentName,
+                s.email      AS studentEmail
+         FROM responsibles r
+         LEFT JOIN students s ON s.responsible_id = r.id
+         WHERE r.id = ?`,
+        [req.userId]
+      )
+      if (rows.length === 0) return res.status(404).json({ error: 'Responsável não encontrado' })
+      return res.json(rows[0])
+    }
+
+    // Usuários do sistema (ADMIN / TEACHER / SECRETARY)
     const [rows] = await pool.query(
-      'SELECT id, full_name AS fullName, email, role FROM users WHERE id = ? AND is_active = 1',
+      `SELECT id, full_name AS fullName, email, phone, cpf, rg,
+              birth_date AS birthDate, role, created_at AS createdAt
+       FROM users WHERE id = ? AND is_active = 1`,
       [req.userId]
     )
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'Usuário não encontrado' })
+    if (rows.length === 0) return res.status(404).json({ error: 'Usuário não encontrado' })
+
+    const user = rows[0]
+
+    // Para professores: inclui lista de turmas
+    if (role === 'TEACHER') {
+      const [classes] = await pool.query(
+        `SELECT c.id, c.name, c.schedule, c.classroom,
+                COUNT(cs.student_id) AS totalStudents
+         FROM classes c
+         LEFT JOIN class_students cs ON cs.class_id = c.id
+         WHERE c.teacher_id = ? AND c.is_active = 1
+         GROUP BY c.id
+         ORDER BY c.name`,
+        [req.userId]
+      )
+      user.classes = classes
     }
-    res.json(rows[0])
+
+    res.json(user)
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Erro ao buscar perfil' })
