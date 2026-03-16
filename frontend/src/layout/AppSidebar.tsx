@@ -1,58 +1,59 @@
-import { useCallback } from "react";
+import React, { useCallback } from "react";
 import { Link, useLocation } from "react-router";
-
+import { GridIcon, HorizontaLDots, UserCircleIcon } from "../icons";
 import {
-  GridIcon,
-  HorizontaLDots,
-  UserCircleIcon,
-} from "../icons";
-import { LuUsers, LuBookOpen, LuGraduationCap, LuCalendarDays, LuHouse, LuKanban } from "react-icons/lu";
+  LuUsers, LuBookOpen, LuGraduationCap, LuCalendarDays,
+  LuHouse, LuKanban, LuPackage, LuChartBar, LuServer,
+} from "react-icons/lu";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../hooks/useAuth";
 import SidebarWidget from "./SidebarWidget";
 
-type NavItem = {
-  name: string;
-  icon: React.ReactNode;
-  path: string;
-};
+type NavItem = { name: string; icon: React.ReactNode; path: string };
 
-// ── Itens comuns a todos os usuários ──────────────────────────────────────────
+// ── Itens comuns ──────────────────────────────────────────────────────────────
 const commonItems: NavItem[] = [
-  { icon: <GridIcon />, name: "Início", path: "/" },
+  { icon: <GridIcon />,        name: "Início",     path: "/" },
+  { icon: <UserCircleIcon />,  name: "Meu Perfil", path: "/profile" },
+  { icon: <LuCalendarDays />,  name: "Calendário", path: "/calendar" },
+];
+
+// ── Admin ─────────────────────────────────────────────────────────────────────
+const adminItems: NavItem[] = [
+  { icon: <LuGraduationCap />, name: "Gerenciar Alunos",      path: "/admin/students" },
+  { icon: <LuUsers />,         name: "Gerenciar Usuários",     path: "/admin/users" },
+  { icon: <LuBookOpen />,      name: "Gerenciar Turmas",       path: "/admin/classes" },
+  { icon: <LuUsers />,         name: "Gerenciar Responsáveis", path: "/admin/responsibles" },
+  { icon: <LuKanban />,        name: "CRM",                   path: "/admin/crm" },
+  { icon: <LuPackage />,       name: "Estoque",               path: "/admin/inventory" },
+  { icon: <LuChartBar />,      name: "Relatórios",            path: "/admin/reports" },
+];
+
+// ── Secretary ─────────────────────────────────────────────────────────────────
+const secretaryItems: NavItem[] = [
+  { icon: <LuGraduationCap />, name: "Alunos",       path: "/secretary/students" },
+  { icon: <LuBookOpen />,      name: "Turmas",        path: "/secretary/classes" },
+  { icon: <LuUsers />,         name: "Responsáveis",  path: "/secretary/responsibles" },
+  { icon: <LuKanban />,        name: "CRM",           path: "/secretary/crm" },
+];
+
+// ── Teacher ───────────────────────────────────────────────────────────────────
+const teacherItems: NavItem[] = [
+  { icon: <LuBookOpen />,     name: "Minhas Turmas", path: "/teacher" },
+  { icon: <LuUsers />,        name: "Meus Alunos",   path: "/teacher/students" },
+  { icon: <LuCalendarDays />, name: "Planos de Aula", path: "/teacher/lesson-plans" },
+];
+
+// ── Responsible ───────────────────────────────────────────────────────────────
+const responsibleItems: NavItem[] = [
+  { icon: <LuHouse />,        name: "Painel",     path: "/responsible" },
   { icon: <UserCircleIcon />, name: "Meu Perfil", path: "/profile" },
   { icon: <LuCalendarDays />, name: "Calendário", path: "/calendar" },
 ];
 
-// ── Itens exclusivos do Admin ─────────────────────────────────────────────────
-const adminItems: NavItem[] = [
-  { icon: <LuGraduationCap />, name: "Gerenciar Alunos",       path: "/admin/students" },
-  { icon: <LuUsers />,         name: "Gerenciar Usuários",      path: "/admin/users" },
-  { icon: <LuBookOpen />,      name: "Gerenciar Turmas",        path: "/admin/classes" },
-  { icon: <LuUsers />,         name: "Gerenciar Responsáveis",  path: "/admin/responsibles" },
-  { icon: <LuKanban />,        name: "CRM",                    path: "/admin/crm" },
-];
-
-// ── Itens exclusivos da Secretaria ────────────────────────────────────────────
-const secretaryItems: NavItem[] = [
-  { icon: <LuGraduationCap />, name: "Alunos",        path: "/secretary/students" },
-  { icon: <LuBookOpen />,      name: "Turmas",         path: "/secretary/classes" },
-  { icon: <LuUsers />,         name: "Responsáveis",   path: "/secretary/responsibles" },
-  { icon: <LuKanban />,        name: "CRM",            path: "/secretary/crm" },
-];
-
-// ── Itens exclusivos do Professor ─────────────────────────────────────────────
-const teacherItems: NavItem[] = [
-  { icon: <LuBookOpen />,      name: "Minhas Turmas",    path: "/teacher" },
-  { icon: <LuUsers />,         name: "Meus Alunos",      path: "/teacher/students" },
-  { icon: <LuCalendarDays />,  name: "Planos de Aula",   path: "/teacher/lesson-plans" },
-];
-
-// ── Itens do Responsável ──────────────────────────────────────────────────────
-const responsibleItems: NavItem[] = [
-  { icon: <LuHouse />,         name: "Painel",      path: "/responsible" },
-  { icon: <UserCircleIcon />,  name: "Meu Perfil",  path: "/profile" },
-  { icon: <LuCalendarDays />,  name: "Calendário",  path: "/calendar" },
+// ── SaaS Owner ────────────────────────────────────────────────────────────────
+const saasItems: NavItem[] = [
+  { icon: <LuServer />, name: "Painel SaaS", path: "/saas" },
 ];
 
 const AppSidebar: React.FC = () => {
@@ -61,12 +62,15 @@ const AppSidebar: React.FC = () => {
   const location = useLocation();
 
   const role = (user?.role || "").toUpperCase();
+  const isSaasOwner = role === "SAAS_OWNER";
 
   const isActive = useCallback((path: string) => {
     if (path === '/') {
-      return location.pathname === '/' || location.pathname === '/secretary' || location.pathname === '/responsible';
+      return location.pathname === '/' ||
+             location.pathname === '/secretary' ||
+             location.pathname === '/responsible';
     }
-    return location.pathname === path;
+    return location.pathname.startsWith(path) && path !== '/';
   }, [location.pathname]);
 
   const renderMenuItems = (items: NavItem[]) => (
@@ -89,14 +93,28 @@ const AppSidebar: React.FC = () => {
     </ul>
   );
 
+  const sectionLabel = (label: string, color: string, icon: React.ReactNode) => (
+    <h2
+      className={`mb-4 text-xs uppercase flex leading-[20px] font-bold ${!isExpanded && !isHovered ? "lg:justify-center" : "justify-start"}`}
+      style={{ color }}
+    >
+      {isExpanded || isHovered || isMobileOpen
+        ? <span className="flex items-center gap-1">{icon}{label}</span>
+        : <HorizontaLDots className="size-6" />}
+    </h2>
+  );
+
   return (
     <aside
-      className={`fixed mt-16 flex flex-col lg:mt-0 top-0 px-5 left-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out z-50 border-r border-gray-200 ${isExpanded || isMobileOpen ? "w-[290px]" : isHovered ? "w-[290px]" : "w-[90px]"} ${isMobileOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}
+      className={`fixed mt-16 flex flex-col lg:mt-0 top-0 px-5 left-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out z-50 border-r border-gray-200
+        ${isExpanded || isMobileOpen ? "w-[290px]" : isHovered ? "w-[290px]" : "w-[90px]"}
+        ${isMobileOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}
       onMouseEnter={() => !isExpanded && setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
+      {/* Logo */}
       <div className={`py-8 flex ${!isExpanded && !isHovered ? "lg:justify-center" : "justify-start"}`}>
-        <Link to="/">
+        <Link to={isSaasOwner ? "/saas" : "/"}>
           {isExpanded || isHovered || isMobileOpen ? (
             <>
               <img className="dark:hidden" src="/images/logo/logo.svg" alt="Logo" width={150} height={40} />
@@ -108,45 +126,53 @@ const AppSidebar: React.FC = () => {
         </Link>
       </div>
 
+      {/* Nav */}
       <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
         <nav className="mb-6">
           <div className="flex flex-col gap-4">
-            <div>
-              <h2 className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${!isExpanded && !isHovered ? "lg:justify-center" : "justify-start"}`}>
-                {isExpanded || isHovered || isMobileOpen ? "Menu" : <HorizontaLDots className="size-6" />}
-              </h2>
-              {role !== "RESPONSIBLE" && renderMenuItems(commonItems)}
-            </div>
 
-            {role === "ADMIN" && (
-              <div>{renderMenuItems(adminItems)}</div>
-            )}
-
-            {role === "SECRETARY" && (
-              <div>{renderMenuItems(secretaryItems)}</div>
-            )}
-
-            {role === "TEACHER" && (
+            {/* ── SAAS OWNER: apenas o painel SaaS ── */}
+            {isSaasOwner && (
               <div>
-                <h2 className={`mb-4 text-xs uppercase flex leading-[20px] font-bold ${!isExpanded && !isHovered ? "lg:justify-center" : "justify-start"}`} style={{ color: "#0d9488" }}>
-                  {isExpanded || isHovered || isMobileOpen ? (
-                    <span className="flex items-center gap-1"><LuBookOpen size={14} /> Professor</span>
-                  ) : <HorizontaLDots />}
-                </h2>
-                {renderMenuItems(teacherItems)}
+                {sectionLabel("SaaS Owner", "#f59e0b", <LuServer size={14} />)}
+                {renderMenuItems(saasItems)}
               </div>
             )}
 
-            {role === "RESPONSIBLE" && (
-              <div>
-                <h2 className={`mb-4 text-xs uppercase flex leading-[20px] font-bold ${!isExpanded && !isHovered ? "lg:justify-center" : "justify-start"}`} style={{ color: "#7c3aed" }}>
-                  {isExpanded || isHovered || isMobileOpen ? (
-                    <span className="flex items-center gap-1"><LuGraduationCap size={14} /> Responsável</span>
-                  ) : <HorizontaLDots />}
-                </h2>
-                {renderMenuItems(responsibleItems)}
-              </div>
+            {/* ── DEMAIS ROLES ── */}
+            {!isSaasOwner && (
+              <>
+                <div>
+                  <h2 className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${!isExpanded && !isHovered ? "lg:justify-center" : "justify-start"}`}>
+                    {isExpanded || isHovered || isMobileOpen ? "Menu" : <HorizontaLDots className="size-6" />}
+                  </h2>
+                  {role !== "RESPONSIBLE" && renderMenuItems(commonItems)}
+                </div>
+
+                {role === "ADMIN" && (
+                  <div>{renderMenuItems(adminItems)}</div>
+                )}
+
+                {role === "SECRETARY" && (
+                  <div>{renderMenuItems(secretaryItems)}</div>
+                )}
+
+                {role === "TEACHER" && (
+                  <div>
+                    {sectionLabel("Professor", "#0d9488", <LuBookOpen size={14} />)}
+                    {renderMenuItems(teacherItems)}
+                  </div>
+                )}
+
+                {role === "RESPONSIBLE" && (
+                  <div>
+                    {sectionLabel("Responsável", "#7c3aed", <LuGraduationCap size={14} />)}
+                    {renderMenuItems(responsibleItems)}
+                  </div>
+                )}
+              </>
             )}
+
           </div>
         </nav>
         {(isExpanded || isHovered || isMobileOpen) && <SidebarWidget />}

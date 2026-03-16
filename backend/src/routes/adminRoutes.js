@@ -14,9 +14,17 @@ import {
   getLessonPlans, createLessonPlan, updateLessonPlan, deleteLessonPlan,
 } from '../controllers/teacherController.js'
 import {
+  getItems, createItem, updateItem, deleteItem, getMovements, registerMovement,
+} from '../controllers/inventoryController.js'
+import {
   getLeads, createLead, updateLead, deleteLead,
-  getActivities, createActivity, toggleActivity, archiveEnrolled, archiveLost,
+  getActivities, createActivity, toggleActivity,
+  archiveEnrolled, archiveLost, getRecentFeed,
 } from '../controllers/crmController.js'
+import {
+  enrollmentsByMonth, cancellationsByMonth, attendanceAll,
+  yearReview, secretaryRanking, crmConversion, citiesRanking,
+} from '../controllers/reportsController.js'
 
 const router = express.Router()
 
@@ -83,6 +91,14 @@ router.post('/classes/:id/lesson-plans',           createLessonPlan)
 router.put('/classes/:id/lesson-plans/:planId',    updateLessonPlan)
 router.delete('/classes/:id/lesson-plans/:planId', deleteLessonPlan)
 
+// Estoque
+router.get('/inventory/items',                    getItems)
+router.post('/inventory/items',                   createItem)
+router.put('/inventory/items/:id',                updateItem)
+router.delete('/inventory/items/:id',             deleteItem)
+router.get('/inventory/items/:id/movements',      getMovements)
+router.post('/inventory/items/:id/movements',     registerMovement)
+
 // CRM
 router.get('/crm/leads',                      getLeads)
 router.post('/crm/leads',                     createLead)
@@ -93,5 +109,15 @@ router.post('/crm/leads/:id/activities',      createActivity)
 router.patch('/crm/activities/:actId/toggle', toggleActivity)
 router.post('/crm/archive-enrolled',          archiveEnrolled)
 router.post('/crm/archive-lost',              archiveLost)
+router.get('/crm/feed',                       getRecentFeed)
+
+// Relatórios pedagógicos
+router.get('/reports/enrollments-by-month',   enrollmentsByMonth)
+router.get('/reports/cancellations-by-month', cancellationsByMonth)
+router.get('/reports/attendance-all',         attendanceAll)
+router.get('/reports/year-review',            yearReview)
+router.get('/reports/secretary-ranking',      secretaryRanking)
+router.get('/reports/crm-conversion',         crmConversion)
+router.get('/reports/cities',                 citiesRanking)
 
 export default router

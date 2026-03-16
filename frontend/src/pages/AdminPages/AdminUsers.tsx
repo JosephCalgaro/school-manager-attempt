@@ -131,7 +131,7 @@ function UserModal({ initial, onClose, onSaved, authFetch }: {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function AdminUsers() {
-  const { authFetch } = useAuth();
+  const { authFetch, user: currentUser } = useAuth();
   const [users, setUsers]       = useState<User[]>([]);
   const [loading, setLoading]   = useState(true);
   const [search, setSearch]     = useState('');
@@ -244,13 +244,16 @@ export default function AdminUsers() {
                       <td className="px-6 py-4 text-sm">
                         <div className="flex items-center gap-3">
                           <button onClick={() => openEdit(u.id)} className="text-brand-600 dark:text-brand-400 hover:underline font-medium">Editar</button>
-                          <button onClick={() => handleToggle(u)} disabled={togglingId === u.id}
-                            title={u.is_active ? 'Desativar' : 'Reativar'}
-                            className={`flex items-center gap-1 text-sm font-medium disabled:opacity-50 transition-colors ${
-                              u.is_active ? 'text-error-600 hover:text-error-700 dark:text-error-400' : 'text-success-600 hover:text-success-700 dark:text-success-400'
-                            }`}>
-                            {u.is_active ? <><LuPowerOff className="h-3.5 w-3.5" /> Desativar</> : <><LuPower className="h-3.5 w-3.5" /> Reativar</>}
-                          </button>
+                          {/* Não permite desativar a si mesmo */}
+                          {u.id !== currentUser?.id && (
+                            <button onClick={() => handleToggle(u)} disabled={togglingId === u.id}
+                              title={u.is_active ? 'Desativar' : 'Reativar'}
+                              className={`flex items-center gap-1 text-sm font-medium disabled:opacity-50 transition-colors ${
+                                u.is_active ? 'text-error-600 hover:text-error-700 dark:text-error-400' : 'text-success-600 hover:text-success-700 dark:text-success-400'
+                              }`}>
+                              {u.is_active ? <><LuPowerOff className="h-3.5 w-3.5" /> Desativar</> : <><LuPower className="h-3.5 w-3.5" /> Reativar</>}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

@@ -14,6 +14,8 @@ import AdminStudents from "./pages/AdminPages/AdminStudents";
 import AdminUsers from "./pages/AdminPages/AdminUsers";
 import AdminClasses from "./pages/AdminPages/AdminClasses";
 import AdminClassDetail from "./pages/AdminPages/AdminClassDetail";
+import AdminInventory from "./pages/AdminPages/AdminInventory";
+import AdminReports from "./pages/AdminPages/AdminReports";
 import TeacherDashboard from "./pages/TeacherPages/TeacherDashboard";
 import TeacherClassDetail from "./pages/TeacherPages/TeacherClassDetail";
 import TeacherStudents from "./pages/TeacherPages/TeacherStudents";
@@ -25,14 +27,16 @@ import SecretaryResponsibles from "./pages/SecretaryPages/SecretaryResponsibles"
 import SecretaryCRM from "./pages/SecretaryPages/SecretaryCRM";
 import StudentDashboard from "./pages/StudentPages/StudentDashboard";
 import ResponsibleDashboard from "./pages/ResponsiblePages/ResponsibleDashboard";
+import SaasPanel from "./pages/SaasPages/SaasPanel";
 
 
 
 // Redireciona alunos para /student, demais usuários ficam no Home padrão
 function HomeRedirect() {
   const { user } = useAuth()
-  if (user?.role === 'STUDENT')    return <Navigate to="/student" replace />
-  if (user?.role === 'SECRETARY')  return <Navigate to="/secretary" replace />
+  if (user?.role === 'SAAS_OWNER')  return <Navigate to="/saas" replace />
+  if (user?.role === 'STUDENT')     return <Navigate to="/student" replace />
+  if (user?.role === 'SECRETARY')   return <Navigate to="/secretary" replace />
   if (user?.role === 'RESPONSIBLE') return <Navigate to="/responsible" replace />
   return <Home />
 }
@@ -70,6 +74,8 @@ export default function App() {
             <Route path="/admin/classes/:id" element={<AdminClassDetail />} />
             <Route path="/admin/responsibles" element={<SecretaryResponsibles apiBase="/admin" />} />
             <Route path="/admin/crm" element={<SecretaryCRM apiBase="/admin" />} />
+            <Route path="/admin/inventory" element={<AdminInventory />} />
+            <Route path="/admin/reports" element={<AdminReports />} />
 
             {/* Secretary */}
             <Route path="/secretary" element={<SecretaryHome />} />
@@ -83,6 +89,9 @@ export default function App() {
             <Route path="/teacher/students" element={<TeacherStudents />} />
             <Route path="/teacher/classes/:id" element={<TeacherClassDetail />} />
             <Route path="/teacher/lesson-plans" element={<TeacherLessonPlans />} />
+
+            {/* SaaS Owner */}
+            <Route path="/saas" element={<SaasPanel />} />
           </Route>
 
           <Route path="/signin" element={<SignIn />} />

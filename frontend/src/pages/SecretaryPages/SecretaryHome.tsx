@@ -46,7 +46,7 @@ export default function SecretaryHome() {
       } finally { setLoading(false) }
     }
     load()
-  }, [])
+  }, [authFetch])
 
   return (
     <>
@@ -56,7 +56,7 @@ export default function SecretaryHome() {
         {/* Header */}
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-            Olá, {user?.fullName?.split(' ')[0]} 👋
+            Olá, {user?.full_name?.split(' ')[0]} 👋
           </h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             Painel da secretaria

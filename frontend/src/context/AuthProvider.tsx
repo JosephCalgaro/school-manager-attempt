@@ -2,13 +2,12 @@ import { useState, useEffect, useRef, ReactNode, useCallback } from 'react'
 import { useNavigate } from 'react-router'
 import { AuthContext, User } from './AuthContext'
 
-// AuthContext, User and AuthContextData are defined in companion file
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [token, setToken] = useState<string | null>(null)
-  const tokenRef = useRef<string | null>(null)
-  const navigate = useNavigate()
+  const [user, setUser]       = useState<User | null>(null)
+  const [token, setToken]     = useState<string | null>(null)
+  const [ready, setReady]     = useState(false)   // ← novo: indica se o localStorage já foi lido
+  const tokenRef              = useRef<string | null>(null)
+  const navigate              = useNavigate()
 
   // read from localStorage on mount
   useEffect(() => {
@@ -23,6 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem('auth')
       }
     }
+    setReady(true)  // ← marca como pronto após ler o localStorage
   }, [])
 
   const saveSession = (userData: User, jwt: string) => {
@@ -63,7 +63,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider value={{ user, token, login, logout, authFetch }}>
-      {children}
+      {/* Aguarda a leitura do localStorage antes de renderizar as rotas */}
+      {ready ? children : null}
     </AuthContext.Provider>
   )
 }

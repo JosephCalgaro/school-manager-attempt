@@ -174,18 +174,18 @@ async function saveAssignmentFiles(assignmentId, files) {
   return savedFiles
 }
 
-async function getAccessibleClass(classId, userId, userRole) {
+async function getAccessibleClass(classId, userId, userRole, schoolId) {
   const isAdmin = isAdminRole(userRole)
   const query = isAdmin
     ? `SELECT c.id, c.name, c.schedule, c.classroom, c.teacher_id, u.full_name AS teacher_name
        FROM classes c
        JOIN users u ON u.id = c.teacher_id
-       WHERE c.id = ?`
+       WHERE c.id = ? AND c.school_id = ?`
     : `SELECT c.id, c.name, c.schedule, c.classroom, c.teacher_id, u.full_name AS teacher_name
        FROM classes c
        JOIN users u ON u.id = c.teacher_id
-       WHERE c.id = ? AND c.teacher_id = ?`
-  const params = isAdmin ? [classId] : [classId, userId]
+       WHERE c.id = ? AND c.teacher_id = ? AND c.school_id = ?`
+  const params = isAdmin ? [classId, schoolId] : [classId, userId, schoolId]
   const [rows] = await pool.query(query, params)
   return rows[0] || null
 }
@@ -205,10 +205,12 @@ async function getGradesColumns() {
   return gradesColumnsCache
 }
 
-async function getTeacherClassesWithStats(teacherId, userRole) {
+async function getTeacherClassesWithStats(teacherId, userRole, schoolId) {
   const isAdmin = isAdminRole(userRole)
-  const whereClause = isAdmin ? 'WHERE c.is_active = 1' : 'WHERE c.teacher_id = ? AND c.is_active = 1'
-  const params = isAdmin ? [] : [teacherId]
+  const whereClause = isAdmin
+    ? 'WHERE c.is_active = 1 AND c.school_id = ?'
+    : 'WHERE c.teacher_id = ? AND c.is_active = 1 AND c.school_id = ?'
+  const params = isAdmin ? [schoolId] : [teacherId, schoolId]
   const [rows] = await pool.query(
     `SELECT
       c.id,
@@ -244,22 +246,20 @@ async function getTeacherClassesWithStats(teacherId, userRole) {
 }
 
 export async function getTeacherStudents(req, res) {
+  const sid = req.schoolId
   try {
     const teacherId = req.userId
     const [rows] = await pool.query(
       `SELECT DISTINCT
-        s.id,
-        s.full_name,
-        s.email,
-        s.phone,
+        s.id, s.full_name, s.email, s.phone,
         c.id   AS class_id,
         c.name AS class_name
       FROM students s
       JOIN class_students cs ON cs.student_id = s.id
       JOIN classes c ON c.id = cs.class_id
-      WHERE c.teacher_id = ?
+      WHERE c.teacher_id = ? AND c.school_id = ? AND s.school_id = ?
       ORDER BY s.full_name`,
-      [teacherId]
+      [teacherId, sid, sid]
     )
     return res.json(rows)
   } catch (err) {
@@ -271,7 +271,7 @@ export async function getTeacherStudents(req, res) {
 async function getClassAssignments(classId, totalStudents = 0) {
   try {
     const [rows] = await pool.query(
-      `SELECT id, title, type, max_score AS maxScore, due_date AS dueDate, description
+      `SELECT id, title, type, max_score, due_date, description
        FROM assignments
        WHERE class_id = ?
        ORDER BY due_date, id`,
@@ -297,7 +297,7 @@ async function getClassAssignments(classId, totalStudents = 0) {
     }
 
     const [rows] = await pool.query(
-      `SELECT id, title, due_date AS dueDate, description
+      `SELECT id, title, due_date, description
        FROM assignments
        WHERE class_id = ?
        ORDER BY due_date, id`,
@@ -307,7 +307,7 @@ async function getClassAssignments(classId, totalStudents = 0) {
     const enriched = rows.map((row) => ({
       ...row,
       type: null,
-      maxScore: null,
+      max_score: null,
       files: []
     }))
     const assignmentIds = enriched.map((item) => item.id)
@@ -333,7 +333,7 @@ async function getClassStudents(classId) {
     const [rows] = await pool.query(
       `SELECT
         s.id,
-        s.full_name AS fullName,
+        s.full_name,
         s.email
       FROM class_students cs
       JOIN students s ON s.id = cs.student_id
@@ -437,25 +437,26 @@ export function isTeacher(req, res, next) {
 }
 
 export async function getTeacherStats(req, res) {
+  const sid = req.schoolId
   try {
     const teacherId = req.userId
     const isAdmin = isAdminRole(req.userRole)
-    const classes = await getTeacherClassesWithStats(teacherId, req.userRole)
+    const classes = await getTeacherClassesWithStats(teacherId, req.userRole, sid)
 
     const [studentsRows] = await pool.query(
       `SELECT COUNT(DISTINCT cs.student_id) AS totalStudents
        FROM classes c
        JOIN class_students cs ON cs.class_id = c.id
-       ${isAdmin ? '' : 'WHERE c.teacher_id = ?'}`,
-      isAdmin ? [] : [teacherId]
+       WHERE c.school_id = ? ${isAdmin ? '' : 'AND c.teacher_id = ?'}`,
+      isAdmin ? [sid] : [sid, teacherId]
     )
 
     const [assignmentsRows] = await pool.query(
       `SELECT COUNT(*) AS upcomingAssignments
        FROM assignments a
        JOIN classes c ON c.id = a.class_id
-       ${isAdmin ? 'WHERE a.due_date >= CURDATE()' : 'WHERE c.teacher_id = ? AND a.due_date >= CURDATE()'}`,
-      isAdmin ? [] : [teacherId]
+       WHERE c.school_id = ? ${isAdmin ? 'AND a.due_date >= CURDATE()' : 'AND c.teacher_id = ? AND a.due_date >= CURDATE()'}`,
+      isAdmin ? [sid] : [sid, teacherId]
     )
 
     res.json({
@@ -472,7 +473,7 @@ export async function getTeacherStats(req, res) {
 
 export async function getTeacherClasses(req, res) {
   try {
-    const classes = await getTeacherClassesWithStats(req.userId, req.userRole)
+    const classes = await getTeacherClassesWithStats(req.userId, req.userRole, req.schoolId)
     res.json(classes)
   } catch (error) {
     console.error(error)
@@ -487,7 +488,7 @@ export async function getTeacherClassById(req, res) {
   }
 
   try {
-    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole)
+    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole, req.schoolId)
     if (!classInfo) {
       return res.status(404).json({ error: 'Turma não encontrada para este professor' })
     }
@@ -548,7 +549,7 @@ export async function getTeacherClassStudents(req, res) {
   }
 
   try {
-    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole)
+    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole, req.schoolId)
     if (!classInfo) {
       return res.status(404).json({ error: 'Turma não encontrada para este professor' })
     }
@@ -579,7 +580,7 @@ export async function registerClassAttendance(req, res) {
   }
 
   try {
-    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole)
+    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole, req.schoolId)
     if (!classInfo) {
       return res.status(404).json({ error: 'Turma não encontrada para este professor' })
     }
@@ -665,7 +666,7 @@ export async function upsertClassGrade(req, res) {
   }
 
   try {
-    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole)
+    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole, req.schoolId)
     if (!classInfo) {
       return res.status(404).json({ error: 'Turma não encontrada para este professor' })
     }
@@ -770,7 +771,7 @@ export async function upsertStudentNotes(req, res) {
   }
 
   try {
-    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole)
+    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole, req.schoolId)
     if (!classInfo) {
       return res.status(404).json({ error: 'Turma não encontrada para este professor' })
     }
@@ -815,7 +816,7 @@ export async function upsertAssignmentCompletions(req, res) {
   }
 
   try {
-    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole)
+    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole, req.schoolId)
     if (!classInfo) return res.status(404).json({ error: 'Turma não encontrada para este professor' })
 
     const [assignmentRows] = await pool.query(
@@ -874,7 +875,7 @@ export async function createClassAssignment(req, res) {
   }
 
   try {
-    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole)
+    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole, req.schoolId)
     if (!classInfo) {
       return res.status(404).json({ error: 'Turma não encontrada para este professor' })
     }
@@ -924,7 +925,7 @@ export async function updateClassAssignment(req, res) {
   }
 
   try {
-    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole)
+    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole, req.schoolId)
     if (!classInfo) {
       return res.status(404).json({ error: 'Turma não encontrada para este professor' })
     }
@@ -1009,7 +1010,7 @@ export async function deleteClassAssignment(req, res) {
   }
 
   try {
-    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole)
+    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole, req.schoolId)
     if (!classInfo) return res.status(404).json({ error: 'Turma não encontrada para este professor' })
 
     const [filesRows] = await pool.query(
@@ -1053,6 +1054,7 @@ async function ensureLessonPlanTables() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS lesson_plan_templates (
       id                 INT AUTO_INCREMENT PRIMARY KEY,
+      school_id          INT NOT NULL DEFAULT 1,
       teacher_id         INT NOT NULL,
       title              VARCHAR(255) NOT NULL,
       description        TEXT NULL,
@@ -1063,7 +1065,8 @@ async function ensureLessonPlanTables() {
       closure            TEXT NULL,
       created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      INDEX idx_lpt_teacher (teacher_id)
+      INDEX idx_lpt_teacher (teacher_id),
+      INDEX idx_lpt_school  (school_id)
     )
   `)
 
@@ -1111,6 +1114,7 @@ async function ensureLessonPlanTables() {
 
 // GET /teacher/lesson-plans
 export async function getMyTemplates(req, res) {
+  const sid = req.schoolId
   try {
     await ensureLessonPlanTables()
     const teacherId = isAdminRole(req.userRole) ? null : req.userId
@@ -1119,8 +1123,8 @@ export async function getMyTemplates(req, res) {
           `SELECT id, teacher_id, title, description,
                   warm_up, ice_breaker, development, language_awareness, closure,
                   custom_sections, created_at, updated_at
-           FROM lesson_plan_templates WHERE teacher_id = ? ORDER BY title`,
-          [teacherId]
+           FROM lesson_plan_templates WHERE teacher_id = ? AND school_id = ? ORDER BY title`,
+          [teacherId, sid]
         )
       : await pool.query(
           `SELECT t.id, t.teacher_id, u.full_name AS teacher_name,
@@ -1129,7 +1133,9 @@ export async function getMyTemplates(req, res) {
                   t.custom_sections, t.created_at, t.updated_at
            FROM lesson_plan_templates t
            LEFT JOIN users u ON u.id = t.teacher_id
-           ORDER BY u.full_name, t.title`
+           WHERE t.school_id = ?
+           ORDER BY u.full_name, t.title`,
+          [sid]
         )
     res.json(rows)
   } catch (err) {
@@ -1141,15 +1147,16 @@ export async function getMyTemplates(req, res) {
 // POST /teacher/lesson-plans
 export async function createTemplate(req, res) {
   const { title, description, warm_up, ice_breaker, development, language_awareness, closure, custom_sections } = req.body || {}
+  const sid = req.schoolId
   if (!title || String(title).trim() === '')
     return res.status(400).json({ error: 'Título é obrigatório' })
   try {
     await ensureLessonPlanTables()
     const [result] = await pool.query(
       `INSERT INTO lesson_plan_templates
-         (teacher_id, title, description, warm_up, ice_breaker, development, language_awareness, closure, custom_sections)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.userId, String(title).trim(),
+         (teacher_id, school_id, title, description, warm_up, ice_breaker, development, language_awareness, closure, custom_sections)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.userId, sid, String(title).trim(),
         description || null, warm_up || null, ice_breaker || null,
         development || null, language_awareness || null, closure || null,
         custom_sections ? JSON.stringify(custom_sections) : null]
@@ -1166,13 +1173,14 @@ export async function createTemplate(req, res) {
 export async function updateTemplate(req, res) {
   const templateId = Number(req.params.templateId)
   const { title, description, warm_up, ice_breaker, development, language_awareness, closure, custom_sections } = req.body || {}
+  const sid = req.schoolId
   if (!Number.isInteger(templateId)) return res.status(400).json({ error: 'ID inválido' })
   try {
     await ensureLessonPlanTables()
     const whereClause = isAdminRole(req.userRole)
-      ? 'WHERE id = ?' : 'WHERE id = ? AND teacher_id = ?'
+      ? 'WHERE id = ? AND school_id = ?' : 'WHERE id = ? AND teacher_id = ? AND school_id = ?'
     const whereParams = isAdminRole(req.userRole)
-      ? [templateId] : [templateId, req.userId]
+      ? [templateId, sid] : [templateId, req.userId, sid]
 
     const [existing] = await pool.query(`SELECT id FROM lesson_plan_templates ${whereClause}`, whereParams)
     if (existing.length === 0) return res.status(404).json({ error: 'Template não encontrado' })
@@ -1200,11 +1208,14 @@ export async function updateTemplate(req, res) {
 // DELETE /teacher/lesson-plans/:templateId
 export async function deleteTemplate(req, res) {
   const templateId = Number(req.params.templateId)
+  const sid = req.schoolId
   if (!Number.isInteger(templateId)) return res.status(400).json({ error: 'ID inválido' })
   try {
     await ensureLessonPlanTables()
-    const whereClause = isAdminRole(req.userRole) ? 'WHERE id = ?' : 'WHERE id = ? AND teacher_id = ?'
-    const whereParams = isAdminRole(req.userRole) ? [templateId] : [templateId, req.userId]
+    const whereClause = isAdminRole(req.userRole)
+      ? 'WHERE id = ? AND school_id = ?' : 'WHERE id = ? AND teacher_id = ? AND school_id = ?'
+    const whereParams = isAdminRole(req.userRole)
+      ? [templateId, sid] : [templateId, req.userId, sid]
     const [result] = await pool.query(`DELETE FROM lesson_plan_templates ${whereClause}`, whereParams)
     if (result.affectedRows === 0) return res.status(404).json({ error: 'Template não encontrado' })
     // desvincula das turmas também
@@ -1223,7 +1234,7 @@ export async function getLessonPlans(req, res) {
   const classId = Number(req.params.id)
   if (!Number.isInteger(classId)) return res.status(400).json({ error: 'ID inválido' })
   try {
-    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole)
+    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole, req.schoolId)
     if (!classInfo) return res.status(404).json({ error: 'Turma não encontrada' })
     await ensureLessonPlanTables()
     const [rows] = await pool.query(
@@ -1253,7 +1264,7 @@ export async function createLessonPlan(req, res) {
   if (!Number.isInteger(Number(template_id))) return res.status(400).json({ error: 'template_id é obrigatório' })
   if (!isValidISODate(planned_date)) return res.status(400).json({ error: 'planned_date deve ser YYYY-MM-DD' })
   try {
-    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole)
+    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole, req.schoolId)
     if (!classInfo) return res.status(404).json({ error: 'Turma não encontrada' })
     await ensureLessonPlanTables()
     const whereClause = isAdminRole(req.userRole) ? 'WHERE id = ?' : 'WHERE id = ? AND teacher_id = ?'
@@ -1290,7 +1301,7 @@ export async function updateLessonPlan(req, res) {
   if (status !== undefined && !VALID_STATUS.includes(String(status).toUpperCase()))
     return res.status(400).json({ error: `status deve ser: ${VALID_STATUS.join(', ')}` })
   try {
-    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole)
+    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole, req.schoolId)
     if (!classInfo) return res.status(404).json({ error: 'Turma não encontrada' })
     await ensureLessonPlanTables()
     const [existing] = await pool.query(
@@ -1327,7 +1338,7 @@ export async function deleteLessonPlan(req, res) {
   if (!Number.isInteger(classId) || !Number.isInteger(planId))
     return res.status(400).json({ error: 'IDs inválidos' })
   try {
-    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole)
+    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole, req.schoolId)
     if (!classInfo) return res.status(404).json({ error: 'Turma não encontrada' })
     await ensureLessonPlanTables()
     const [result] = await pool.query(

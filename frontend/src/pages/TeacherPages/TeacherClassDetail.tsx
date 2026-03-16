@@ -14,9 +14,9 @@ type Assignment = {
   id: number
   title: string
   type: string | null
-  dueDate: string
+  due_date: string
   description: string | null
-  maxScore: number | null
+  max_score: number | null
   files?: AssignmentFile[]
   completion: {
     byStudent: Record<number, boolean>
@@ -29,7 +29,7 @@ type Assignment = {
 
 type Student = {
   id: number
-  fullName: string
+  full_name: string
   email: string | null
   attendanceRate: number
   note1: number | null
@@ -469,9 +469,9 @@ export default function TeacherClassDetail({ apiBase = '/teacher' }: TeacherClas
     setEditingAssignmentId(assignment.id)
     setEditAssignment({
       title: assignment.title,
-      dueDate: assignment.dueDate?.slice(0, 10),
+      dueDate: assignment.due_date?.slice(0, 10),
       type: assignment.type || 'WORK',
-      maxScore: assignment.maxScore === null ? '' : String(assignment.maxScore),
+      maxScore: assignment.max_score === null ? '' : String(assignment.max_score),
       description: assignment.description || ''
     })
     setEditAssignmentFiles([])
@@ -777,7 +777,7 @@ export default function TeacherClassDetail({ apiBase = '/teacher' }: TeacherClas
             <tbody>
               {studentList.map((student) => (
                 <tr key={student.id} className="border-b border-gray-100 last:border-0 dark:border-gray-800">
-                  <td className="px-4 py-3 text-gray-900 dark:text-white">{student.fullName}</td>
+                  <td className="px-4 py-3 text-gray-900 dark:text-white">{student.full_name}</td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{student.email || '-'}</td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{student.attendanceRate.toFixed(1)}%</td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{student.average ?? '-'}</td>
@@ -797,7 +797,7 @@ export default function TeacherClassDetail({ apiBase = '/teacher' }: TeacherClas
           <div className="space-y-2">
             {studentList.map((student) => (
               <label key={student.id} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-800">
-                <span className="text-gray-800 dark:text-gray-200">{student.fullName}</span>
+                <span className="text-gray-800 dark:text-gray-200">{student.full_name}</span>
                 <span className="inline-flex items-center gap-2">
                   <input type="checkbox" checked={Boolean(attendanceMap[student.id])} onChange={(e) => setAttendanceMap((prev) => ({ ...prev, [student.id]: e.target.checked }))} />
                   <span className="text-gray-600 dark:text-gray-400">Presente</span>
@@ -844,7 +844,7 @@ export default function TeacherClassDetail({ apiBase = '/teacher' }: TeacherClas
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <p className="font-medium text-blue-700 dark:text-blue-400">{assignment.title}</p>
-                            <p className="text-xs text-gray-600 dark:text-gray-400">Entrega: {new Date(assignment.dueDate).toLocaleDateString('pt-BR')}</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400">Entrega: {new Date(assignment.due_date).toLocaleDateString('pt-BR')}</p>
                           </div>
                           <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                             assignment.completion?.allCompleted
@@ -867,7 +867,7 @@ export default function TeacherClassDetail({ apiBase = '/teacher' }: TeacherClas
                         <div className="mt-3 space-y-2 rounded-lg border border-gray-200 p-2 dark:border-gray-700">
                           {studentList.map((student) => (
                             <label key={student.id} className="flex items-center justify-between text-sm">
-                              <span className="text-gray-700 dark:text-gray-300">{student.fullName}</span>
+                              <span className="text-gray-700 dark:text-gray-300">{student.full_name}</span>
                               <span className="inline-flex items-center gap-2">
                                 <input
                                   type="checkbox"
@@ -949,7 +949,7 @@ export default function TeacherClassDetail({ apiBase = '/teacher' }: TeacherClas
               <tbody>
                 {studentList.map((student) => (
                   <tr key={student.id} className="border-b border-gray-100 last:border-0 dark:border-gray-800">
-                    <td className="px-3 py-2 text-gray-900 dark:text-white">{student.fullName}</td>
+                    <td className="px-3 py-2 text-gray-900 dark:text-white">{student.full_name}</td>
                     <td className="px-3 py-2">
                       <input type="number" min="0" max="10" value={noteDrafts[student.id]?.note1 ?? ''} onChange={(e) => setNoteDrafts((prev) => ({ ...prev, [student.id]: { ...(prev[student.id] || { note1: '', note2: '', note3: '' }), note1: e.target.value } }))} className="w-20 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-800 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-brand-500/30" />
                     </td>

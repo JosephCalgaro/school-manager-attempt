@@ -24,7 +24,7 @@ export default function UserInfoCard() {
               Nome Completo
             </p>
             <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-              {user?.fullName || "-"}
+              {user?.full_name || "-"}
             </p>
           </div>
 

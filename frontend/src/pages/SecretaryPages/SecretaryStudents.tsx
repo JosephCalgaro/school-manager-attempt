@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { LuSearch, LuX, LuPlus, LuUserPlus, LuEye, LuPowerOff, LuPower } from 'react-icons/lu'
+import { LuSearch, LuX, LuPlus, LuUserPlus, LuEye, LuPowerOff, LuPower, LuTriangleAlert } from 'react-icons/lu'
 import { useAuth } from '../../hooks/useAuth'
 
 interface Student {
   id: number; full_name: string; cpf: string; email: string
-  phone?: string | null; birth_date: string; created_at: string; is_active: number
+  phone?: string | null; birth_date: string; created_at: string
+  is_active: number; deactivation_reason?: string | null; city?: string | null
 }
 interface Responsible {
   full_name: string; cpf: string; rg: string; birth_date: string
@@ -12,8 +13,8 @@ interface Responsible {
 }
 interface StudentForm {
   full_name: string; cpf: string; rg: string; birth_date: string
-  address: string; email: string; phone: string; due_day: string
-  password: string; responsible: Responsible | null
+  address: string; city: string; email: string; phone: string; due_day: string
+  password: string; deactivation_reason?: string; responsible: Responsible | null
 }
 interface AttendanceStats {
   total: number; present: number; absent: number; percentage: string
@@ -28,8 +29,8 @@ interface Assignment {
 }
 
 const emptyForm = (): StudentForm => ({
-  full_name: '', cpf: '', rg: '', birth_date: '', address: '',
-  email: '', phone: '', due_day: '', password: '', responsible: null,
+  full_name: '', cpf: '', rg: '', birth_date: '', address: '', city: '',
+  email: '', phone: '', due_day: '', password: '', deactivation_reason: '', responsible: null,
 })
 const emptyResp = (): Responsible => ({
   full_name: '', cpf: '', rg: '', birth_date: '', address: '', email: '', phone: '', password: '',
@@ -45,6 +46,7 @@ const S_FIELDS: SField[] = [
   { key: 'rg', label: 'RG' },
   { key: 'birth_date', label: 'Nascimento', type: 'date' },
   { key: 'phone', label: 'Telefone' },
+  { key: 'city', label: 'Cidade' },
   { key: 'address', label: 'Endereço' },
   { key: 'due_day', label: 'Dia de vencimento', type: 'number' },
 ]
@@ -58,6 +60,59 @@ const R_FIELDS: RField[] = [
   { key: 'address', label: 'Endereço' },
   { key: 'password', label: 'Senha de acesso', type: 'password' },
 ]
+
+const DEACTIVATION_REASONS = [
+  'Financeiro',
+  'Mudança de cidade',
+  'Conclusão do curso',
+  'Insatisfação com o ensino',
+  'Problemas pessoais',
+  'Outro',
+]
+
+function DeactivateModal({ studentName, onClose, onConfirm }: {
+  studentName: string
+  onClose: () => void
+  onConfirm: (reason: string) => void
+}) {
+  const [reason, setReason] = useState(DEACTIVATION_REASONS[0])
+  const [custom, setCustom] = useState('')
+  const finalReason = reason === 'Outro' ? (custom.trim() || 'Outro') : reason
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-900 shadow-xl p-6 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+            <LuTriangleAlert className="h-5 w-5 text-red-600 dark:text-red-400" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-900 dark:text-white">Desativar aluno</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-[220px]">{studentName}</p>
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Motivo do cancelamento</label>
+          <select value={reason} onChange={e => setReason(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/30">
+            {DEACTIVATION_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+        {reason === 'Outro' && (
+          <div>
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Descreva o motivo</label>
+            <input value={custom} onChange={e => setCustom(e.target.value)} placeholder="Ex: Viagem ao exterior..."
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/30" />
+          </div>
+        )}
+        <div className="flex justify-end gap-2 pt-2">
+          <button onClick={onClose} className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800">Cancelar</button>
+          <button onClick={() => onConfirm(finalReason)} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">Confirmar</button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // ─── Modal de detalhes (presença, atividades, notas) ─────────────────────────
 function StudentDetailsModal({ studentId, studentName, onClose, authFetch }: {
@@ -271,6 +326,19 @@ function StudentModal({ initial, onClose, onSaved, authFetch }: {
                 <input type="password" value={form.password} onChange={e => setStudent('password', e.target.value)}
                   className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
               </div>
+              {/* Motivo de cancelamento — só na edição */}
+              {isEdit && (
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Motivo do cancelamento</label>
+                  <select value={form.deactivation_reason || ''} onChange={e => setForm(p => ({ ...p, deactivation_reason: e.target.value }))}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                    <option value="">— Sem motivo —</option>
+                    {['Financeiro','Mudança de cidade','Conclusão do curso','Insatisfação com o ensino','Problemas pessoais','Outro'].map(r =>
+                      <option key={r} value={r}>{r}</option>
+                    )}
+                  </select>
+                </div>
+              )}
             </div>
           </div>
 
@@ -322,6 +390,7 @@ export default function SecretaryStudents() {
   const [detailsId, setDetailsId] = useState<number | null>(null)
   const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active')
   const [togglingId, setTogglingId] = useState<number | null>(null)
+  const [deactivateTarget, setDeactivateTarget] = useState<Student | null>(null)
 
   const fetchStudents = useCallback(async () => {
     try {
@@ -341,10 +410,14 @@ export default function SecretaryStudents() {
 
   useEffect(() => { fetchStudents() }, [fetchStudents])
 
-  const handleToggle = async (s: Student) => {
+  const handleToggle = async (s: Student, deactivation_reason?: string) => {
     setTogglingId(s.id)
     try {
-      await authFetch(`/secretary/students/${s.id}/toggle`, { method: 'PATCH' })
+      await authFetch(`/secretary/students/${s.id}/toggle`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deactivation_reason: deactivation_reason || null }),
+      })
       await fetchStudents()
     } finally { setTogglingId(null) }
   }
@@ -356,14 +429,15 @@ export default function SecretaryStudents() {
     const form: StudentForm = {
       full_name: d.full_name || '', cpf: d.cpf || '', rg: d.rg || '',
       birth_date: d.birth_date ? String(d.birth_date).slice(0, 10) : '',
-      address: d.address || '', email: d.email || '', phone: d.phone || '',
+      address: d.address || '', city: d.city || '', email: d.email || '', phone: d.phone || '',
       due_day: d.due_day ? String(d.due_day) : '', password: '',
+      deactivation_reason: d.deactivation_reason || '',
       responsible: d.responsible ? {
         full_name: d.responsible.full_name || '', cpf: d.responsible.cpf || '',
         rg: d.responsible.rg || '',
         birth_date: d.responsible.birth_date ? String(d.responsible.birth_date).slice(0, 10) : '',
         address: d.responsible.address || '', email: d.responsible.email || '',
-        phone: d.responsible.phone || '',
+        phone: d.responsible.phone || '', password: '',
       } : null,
     }
     setModal({ id, form })
@@ -414,9 +488,13 @@ export default function SecretaryStudents() {
               <table className="w-full text-sm">
                 <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-700">
                   <tr>
-                    {['Nome', 'Status', 'Email', 'Telefone', 'CPF', 'Ações'].map(h => (
+                    {['Nome', 'Status', 'Email', 'Telefone', 'CPF'].map(h => (
                       <th key={h} className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-gray-300">{h}</th>
                     ))}
+                    {statusFilter !== 'active' && (
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-gray-300">Motivo cancel.</th>
+                    )}
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-gray-300">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -434,6 +512,13 @@ export default function SecretaryStudents() {
                       <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{s.email}</td>
                       <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{s.phone || '-'}</td>
                       <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{s.cpf}</td>
+                      {statusFilter !== 'active' && (
+                        <td className="px-6 py-4">
+                          {s.deactivation_reason
+                            ? <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs text-red-700 dark:bg-red-900/20 dark:text-red-400">{s.deactivation_reason}</span>
+                            : <span className="text-gray-400 text-xs">—</span>}
+                        </td>
+                      )}
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <button onClick={() => setDetailsId(s.id)}
@@ -441,7 +526,7 @@ export default function SecretaryStudents() {
                             <LuEye className="h-4 w-4" /> Ver
                           </button>
                           <button onClick={() => openEdit(s.id)} className="text-brand-600 dark:text-brand-400 hover:underline font-medium text-sm">Editar</button>
-                          <button onClick={() => handleToggle(s)} disabled={togglingId === s.id}
+                          <button onClick={() => s.is_active ? setDeactivateTarget(s) : handleToggle(s)} disabled={togglingId === s.id}
                             className={`flex items-center gap-1 text-sm font-medium disabled:opacity-50 ${
                               s.is_active ? 'text-error-600 hover:text-error-700 dark:text-error-400' : 'text-success-600 hover:text-success-700 dark:text-success-400'
                             }`}>
@@ -468,6 +553,14 @@ export default function SecretaryStudents() {
           </>
         )}
       </div>
+
+      {deactivateTarget && (
+        <DeactivateModal
+          studentName={deactivateTarget.full_name}
+          onClose={() => setDeactivateTarget(null)}
+          onConfirm={(reason) => { handleToggle(deactivateTarget, reason); setDeactivateTarget(null) }}
+        />
+      )}
 
       {modal && (
         <StudentModal

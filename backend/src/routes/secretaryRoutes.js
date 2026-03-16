@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { getLeads, createLead, updateLead, deleteLead, getActivities, createActivity, toggleActivity, archiveEnrolled, archiveLost } from '../controllers/crmController.js'
+import { getLeads, createLead, updateLead, deleteLead, getActivities, createActivity, toggleActivity, archiveEnrolled, archiveLost, getRecentFeed } from '../controllers/crmController.js'
 import {
   getAllStudents, getStudentDetails, createStudent, updateStudentDetails,
   getStudentClasses, getStudentAttendance, getStudentAssignments,
@@ -64,5 +64,6 @@ router.post('/crm/leads/:id/activities',         createActivity)
 router.patch('/crm/activities/:actId/toggle',    toggleActivity)
 router.post('/crm/archive-enrolled',             archiveEnrolled)
 router.post('/crm/archive-lost',                 archiveLost)
+router.get('/crm/feed',                          getRecentFeed)
 
 export default router

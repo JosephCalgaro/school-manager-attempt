@@ -31,6 +31,7 @@ export default defineConfig({
       "/uploads": "http://localhost:3333",
       "/attendance": "http://localhost:3333",
       "/ping": "http://localhost:3333",
+      "/saas": "http://localhost:3333",
     },
   },
 });

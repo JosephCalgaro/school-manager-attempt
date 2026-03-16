@@ -20,6 +20,8 @@ export default function UserDropdown() {
     logout();
   }
 
+  const displayName = user?.full_name || (user as { fullName?: string })?.fullName || "Usuário"
+
   return (
     <div className="relative">
       <button
@@ -27,11 +29,11 @@ export default function UserDropdown() {
         className="flex items-center text-gray-700 dropdown-toggle dark:text-gray-400"
       >
         <span className="mr-3 overflow-hidden rounded-full h-11 w-11 bg-brand-500 flex items-center justify-center text-white font-semibold text-lg">
-          {user?.fullName ? user.fullName.charAt(0).toUpperCase() : "U"}
+          {displayName.charAt(0).toUpperCase()}
         </span>
 
         <span className="block mr-1 font-medium text-theme-sm">
-          {user?.fullName || "Usuário"}
+          {displayName}
         </span>
         <svg
           className={`stroke-gray-500 dark:stroke-gray-400 transition-transform duration-200 ${
@@ -60,7 +62,7 @@ export default function UserDropdown() {
       >
         <div>
           <span className="block font-medium text-gray-700 text-theme-sm dark:text-gray-400">
-            {user?.fullName || "Usuário"}
+            {displayName}
           </span>
           <span className="mt-0.5 block text-theme-xs text-gray-500 dark:text-gray-400">
             {user?.email || ""}

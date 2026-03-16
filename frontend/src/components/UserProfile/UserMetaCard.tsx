@@ -17,12 +17,12 @@ export default function UserMetaCard() {
         <div className="flex flex-col items-center w-full gap-6 xl:flex-row">
           <div className="flex items-center justify-center w-20 h-20 overflow-hidden border border-gray-200 rounded-full bg-gray-100 dark:border-gray-800 dark:bg-gray-800">
             <span className="text-2xl font-semibold text-gray-600 dark:text-white/70">
-              {user?.fullName?.charAt(0)?.toUpperCase() || "U"}
+              {user?.full_name?.charAt(0)?.toUpperCase() || "U"}
             </span>
           </div>
           <div>
             <h4 className="mb-2 text-lg font-semibold text-center text-gray-800 dark:text-white/90 xl:text-left">
-              {user?.fullName || "Usuário"}
+              {user?.full_name || "Usuário"}
             </h4>
             <div className="flex flex-col items-center gap-1 text-center xl:flex-row xl:gap-3 xl:text-left">
               <p className="text-sm text-gray-500 dark:text-gray-400">

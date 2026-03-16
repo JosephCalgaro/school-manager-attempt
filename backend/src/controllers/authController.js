@@ -6,9 +6,16 @@ const JWT_SECRET = process.env.JWT_SECRET || 'secret123'
 const TOKEN_EXPIRES_IN = '10h'
 
 export function signToken(user) {
-  return jwt.sign({ sub: user.id, role: user.role }, JWT_SECRET, {
-    expiresIn: TOKEN_EXPIRES_IN
-  })
+  return jwt.sign(
+    {
+      sub:       user.id,
+      role:      user.role,
+      school_id: user.school_id ?? 1,
+      is_temp:   user.is_temp   ?? false,
+    },
+    JWT_SECRET,
+    { expiresIn: TOKEN_EXPIRES_IN }
+  )
 }
 
 export function verifyToken(token) {
@@ -27,7 +34,7 @@ export async function login(req, res) {
   try {
     // 1. Tenta usuário comum
     const [userRows] = await pool.query(
-      'SELECT id, full_name AS fullName, email, password_hash, role, is_active FROM users WHERE email = ?',
+      'SELECT id, full_name, email, password_hash, role, is_active, school_id FROM users WHERE email = ?',
       [email]
     )
 
@@ -50,7 +57,7 @@ export async function login(req, res) {
 
     // 2. Tenta aluno
     const [studentRows] = await pool.query(
-      'SELECT id, full_name AS fullName, email, password_hash FROM students WHERE email = ?',
+      'SELECT id, full_name, email, password_hash, school_id FROM students WHERE email = ?',
       [email]
     )
 
@@ -68,7 +75,7 @@ export async function login(req, res) {
 
     // 3. Tenta responsável
     const [respRows] = await pool.query(
-      'SELECT id, full_name AS fullName, email, password_hash FROM responsibles WHERE email = ?',
+      'SELECT id, full_name, email, password_hash, school_id FROM responsibles WHERE email = ?',
       [email]
     )
 
@@ -98,15 +105,30 @@ export async function getProfile(req, res) {
   const role = (req.userRole || '').toUpperCase()
 
   try {
-    // Aluno
+    // ── Token temporário (SaaS impersonando escola) ───────────────────────────
+    // Não existe row no banco para este token — retorna dados sintéticos
+    if (req.isTemp) {
+      const [[school]] = await pool.query(
+        'SELECT id, name FROM schools WHERE id = ? LIMIT 1', [req.schoolId]
+      )
+      return res.json({
+        id:          req.userId,
+        full_name:   req.saasName ?? 'SaaS Owner',
+        email:       '',
+        role:        'ADMIN',
+        school_id:   req.schoolId,
+        school_name: school?.name ?? '',
+        is_temp:     true,
+      })
+    }
     if (role === 'STUDENT') {
       const [rows] = await pool.query(
-        `SELECT s.id, s.full_name AS fullName, s.email, s.phone, s.cpf, s.rg,
-                s.birth_date AS birthDate, s.address, s.due_day AS dueDay,
+        `SELECT s.id, s.full_name, s.email, s.phone, s.cpf, s.rg,
+                s.birth_date, s.address, s.due_day,
                 'STUDENT' AS role,
-                r.full_name AS responsibleName,
-                r.email     AS responsibleEmail,
-                r.phone     AS responsiblePhone
+                r.full_name AS responsible_name,
+                r.email     AS responsible_email,
+                r.phone     AS responsible_phone
          FROM students s
          LEFT JOIN responsibles r ON s.responsible_id = r.id
          WHERE s.id = ?`,
@@ -119,12 +141,12 @@ export async function getProfile(req, res) {
     // Responsável
     if (role === 'RESPONSIBLE') {
       const [rows] = await pool.query(
-        `SELECT r.id, r.full_name AS fullName, r.email, r.phone, r.cpf, r.rg,
-                r.birth_date AS birthDate, r.address,
+        `SELECT r.id, r.full_name, r.email, r.phone, r.cpf, r.rg,
+                r.birth_date, r.address,
                 'RESPONSIBLE' AS role,
-                s.id         AS studentId,
-                s.full_name  AS studentName,
-                s.email      AS studentEmail
+                s.id         AS student_id,
+                s.full_name  AS student_name,
+                s.email      AS student_email
          FROM responsibles r
          LEFT JOIN students s ON s.responsible_id = r.id
          WHERE r.id = ?`,
@@ -134,10 +156,10 @@ export async function getProfile(req, res) {
       return res.json(rows[0])
     }
 
-    // Usuários do sistema (ADMIN / TEACHER / SECRETARY)
+    // Usuários do sistema (ADMIN / TEACHER / SECRETARY / SAAS_OWNER)
     const [rows] = await pool.query(
-      `SELECT id, full_name AS fullName, email, phone, cpf, rg,
-              birth_date AS birthDate, role, created_at AS createdAt
+      `SELECT id, full_name, email, phone, cpf, rg,
+              birth_date, role, school_id, created_at
        FROM users WHERE id = ? AND is_active = 1`,
       [req.userId]
     )

@@ -18,24 +18,24 @@ interface ProfileClass {
 
 interface ProfileData {
   id: number
-  fullName: string
+  full_name: string
   email: string
   role: string
   phone?: string | null
   cpf?: string | null
   rg?: string | null
-  birthDate?: string | null
+  birth_date?: string | null
   address?: string | null
-  dueDay?: number | null
-  createdAt?: string | null
+  due_day?: number | null
+  created_at?: string | null
   // STUDENT
-  responsibleName?: string | null
-  responsibleEmail?: string | null
-  responsiblePhone?: string | null
+  responsible_name?: string | null
+  responsible_email?: string | null
+  responsible_phone?: string | null
   // RESPONSIBLE
-  studentId?: number | null
-  studentName?: string | null
-  studentEmail?: string | null
+  student_id?: number | null
+  student_name?: string | null
+  student_email?: string | null
   // TEACHER
   classes?: ProfileClass[]
 }
@@ -144,10 +144,10 @@ export default function UserProfiles() {
         {/* — Cabeçalho avatar ——————————————————————————————————————————— */}
         <div className="flex items-center gap-5 rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
           <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-brand-500 text-2xl font-bold text-white">
-            {profile.fullName?.charAt(0).toUpperCase()}
+            {profile.full_name?.charAt(0).toUpperCase()}
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{profile.fullName}</h2>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{profile.full_name}</h2>
             <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{profile.email}</p>
             <span className={`mt-2 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${roleBadgeColor[role] || 'bg-gray-100 text-gray-600'}`}>
               {roleLabels[role] || role}
@@ -157,42 +157,42 @@ export default function UserProfiles() {
 
         {/* — Informações pessoais ——————————————————————————————————————— */}
         <Section title="Informações Pessoais">
-          <Field icon={<LuUser className="h-4 w-4"/>}        label="Nome Completo"       value={profile.fullName} />
+          <Field icon={<LuUser className="h-4 w-4"/>}        label="Nome Completo"       value={profile.full_name} />
           <Field icon={<LuMail className="h-4 w-4"/>}        label="Email"               value={profile.email} />
           <Field icon={<LuPhone className="h-4 w-4"/>}       label="Telefone"            value={profile.phone} />
           <Field icon={<LuIdCard className="h-4 w-4"/>}      label="CPF"                 value={formatCPF(profile.cpf)} />
           {profile.rg && (
             <Field icon={<LuIdCard className="h-4 w-4"/>}    label="RG"                  value={profile.rg} />
           )}
-          {profile.birthDate && (
-            <Field icon={<LuCalendarDays className="h-4 w-4"/>} label="Data de Nascimento" value={formatDate(profile.birthDate)} />
+          {profile.birth_date && (
+            <Field icon={<LuCalendarDays className="h-4 w-4"/>} label="Data de Nascimento" value={formatDate(profile.birth_date)} />
           )}
           {profile.address && (
             <Field icon={<LuMapPin className="h-4 w-4"/>}    label="Endereço"            value={profile.address} />
           )}
-          {role === 'STUDENT' && profile.dueDay && (
-            <Field icon={<LuCalendarDays className="h-4 w-4"/>} label="Dia de Vencimento" value={`Todo dia ${profile.dueDay}`} />
+          {role === 'STUDENT' && profile.due_day && (
+            <Field icon={<LuCalendarDays className="h-4 w-4"/>} label="Dia de Vencimento" value={`Todo dia ${profile.due_day}`} />
           )}
-          {profile.createdAt && (
-            <Field icon={<LuClock className="h-4 w-4"/>}     label="Membro desde"        value={formatDate(profile.createdAt)} />
+          {profile.created_at && (
+            <Field icon={<LuClock className="h-4 w-4"/>}     label="Membro desde"        value={formatDate(profile.created_at)} />
           )}
           <Field icon={<LuBadgeCheck className="h-4 w-4"/>}  label="Cargo / Função"      value={roleLabels[role] || role} />
         </Section>
 
         {/* — Responsável (somente STUDENT) ————————————————————————————— */}
-        {role === 'STUDENT' && (profile.responsibleName || profile.responsibleEmail) && (
+        {role === 'STUDENT' && (profile.responsible_name || profile.responsible_email) && (
           <Section title="Responsável">
-            <Field icon={<LuUser className="h-4 w-4"/>}  label="Nome"      value={profile.responsibleName} />
-            <Field icon={<LuMail className="h-4 w-4"/>}  label="Email"     value={profile.responsibleEmail} />
-            <Field icon={<LuPhone className="h-4 w-4"/>} label="Telefone"  value={profile.responsiblePhone} />
+            <Field icon={<LuUser className="h-4 w-4"/>}  label="Nome"      value={profile.responsible_name} />
+            <Field icon={<LuMail className="h-4 w-4"/>}  label="Email"     value={profile.responsible_email} />
+            <Field icon={<LuPhone className="h-4 w-4"/>} label="Telefone"  value={profile.responsible_phone} />
           </Section>
         )}
 
         {/* — Aluno vinculado (somente RESPONSIBLE) ————————————————————— */}
-        {role === 'RESPONSIBLE' && profile.studentName && (
+        {role === 'RESPONSIBLE' && profile.student_name && (
           <Section title="Aluno Vinculado">
-            <Field icon={<LuUser className="h-4 w-4"/>}  label="Nome"  value={profile.studentName} />
-            <Field icon={<LuMail className="h-4 w-4"/>}  label="Email" value={profile.studentEmail} />
+            <Field icon={<LuUser className="h-4 w-4"/>}  label="Nome"  value={profile.student_name} />
+            <Field icon={<LuMail className="h-4 w-4"/>}  label="Email" value={profile.student_email} />
           </Section>
         )}
 
