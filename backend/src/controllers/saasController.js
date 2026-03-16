@@ -2,7 +2,7 @@ import pool  from '../database/connection.js'
 import jwt   from 'jsonwebtoken'
 import { logEvent } from '../middlewares/logger.js'
 
-const JWT_SECRET    = process.env.JWT_SECRET || 'secret123'
+const JWT_SECRET    = process.env.JWT_SECRET
 const TEMP_EXPIRES_H = 2  // horas de validade do token temporário
 
 // ─── Token temporário (vive só no JWT, sem user no banco) ────────────────────
