@@ -8,7 +8,10 @@ export function authenticate(req, res, next) {
     const payload = verifyToken(token)
     req.userId   = payload.sub
     req.userRole = payload.role
-    req.schoolId = payload.school_id ?? 1
+    req.schoolId = payload.school_id
+    if (!req.schoolId && req.userRole !== 'SAAS_OWNER') {
+      return res.status(401).json({ error: 'Token inválido: school_id ausente' })
+    }
     req.isTemp   = payload.is_temp   ?? false
     req.saasName = payload.saas_name ?? null   // presente só em tokens temporários
     next()

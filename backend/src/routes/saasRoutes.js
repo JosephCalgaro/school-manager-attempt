@@ -11,7 +11,8 @@ import { getRecentLogs } from '../middlewares/logger.js'
 
 const router = Router()
 
-const SAAS_KEY = process.env.SAAS_MASTER_KEY || 'saas_dev_key_change_in_production'
+const SAAS_KEY = process.env.SAAS_MASTER_KEY
+if (!SAAS_KEY) throw new Error('SAAS_MASTER_KEY não definido no .env — rotas SaaS bloqueadas.')
 
 function requireSaasKey(req, res, next) {
   const key = req.headers['x-saas-key']

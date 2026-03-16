@@ -1,9 +1,17 @@
 import pool from '../database/connection.js'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
+import { recordFailedLogin, clearLoginAttempts } from '../middlewares/rateLimiter.js'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'secret123'
-const TOKEN_EXPIRES_IN = '10h'
+const JWT_SECRET = process.env.JWT_SECRET
+if (!JWT_SECRET) throw new Error('JWT_SECRET não definido no .env — servidor não pode iniciar com segurança.')
+const TOKEN_EXPIRES_IN = '2h'
+
+function getIp(req) {
+  return req.headers['x-forwarded-for']?.split(',')[0].trim()
+    || req.socket?.remoteAddress
+    || 'unknown'
+}
 
 export function signToken(user) {
   return jwt.sign(
@@ -42,14 +50,17 @@ export async function login(req, res) {
       const user = userRows[0]
 
       if (!user.is_active) {
+        recordFailedLogin(getIp(req))
         return res.status(403).json({ error: 'Usuário inativo' })
       }
 
       const match = await bcrypt.compare(password, user.password_hash)
       if (!match) {
+        recordFailedLogin(getIp(req))
         return res.status(401).json({ error: 'Credenciais inválidas' })
       }
 
+      clearLoginAttempts(getIp(req))
       const token = signToken(user)
       delete user.password_hash
       return res.json({ user, token })
@@ -64,10 +75,15 @@ export async function login(req, res) {
     if (studentRows.length > 0) {
       const student = studentRows[0]
       if (!student.password_hash) {
+        recordFailedLogin(getIp(req))
         return res.status(403).json({ error: 'Acesso não configurado. Contate a secretaria.' })
       }
       const match = await bcrypt.compare(password, student.password_hash)
-      if (!match) return res.status(401).json({ error: 'Credenciais inválidas' })
+      if (!match) {
+        recordFailedLogin(getIp(req))
+        return res.status(401).json({ error: 'Credenciais inválidas' })
+      }
+      clearLoginAttempts(getIp(req))
       const token = signToken({ id: student.id, role: 'STUDENT' })
       delete student.password_hash
       return res.json({ user: { ...student, role: 'STUDENT' }, token })
@@ -82,15 +98,21 @@ export async function login(req, res) {
     if (respRows.length > 0) {
       const resp = respRows[0]
       if (!resp.password_hash) {
+        recordFailedLogin(getIp(req))
         return res.status(403).json({ error: 'Senha não configurada. Contate a secretaria para definir sua senha.' })
       }
       const match = await bcrypt.compare(password, resp.password_hash)
-      if (!match) return res.status(401).json({ error: 'Credenciais inválidas' })
+      if (!match) {
+        recordFailedLogin(getIp(req))
+        return res.status(401).json({ error: 'Credenciais inválidas' })
+      }
+      clearLoginAttempts(getIp(req))
       const token = signToken({ id: resp.id, role: 'RESPONSIBLE' })
       delete resp.password_hash
       return res.json({ user: { ...resp, role: 'RESPONSIBLE' }, token })
     }
 
+    recordFailedLogin(getIp(req))
     return res.status(401).json({ error: 'Email não encontrado. Verifique suas credenciais.' })
 
   } catch (err) {
