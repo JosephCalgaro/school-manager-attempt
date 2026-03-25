@@ -4,6 +4,7 @@ import cors    from 'cors'
 
 import pool from './database/connection.js'
 import { ensureContactColumns }           from './database/migrations.js'
+import { initCrmTables }                  from './controllers/crmController.js'
 import { authenticate }                   from './middlewares/auth.js'
 import { requestLogger, errorHandler }    from './middlewares/logger.js'
 
@@ -26,7 +27,7 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 app.use(cors({ origin: allowedOrigins, credentials: true }))
 
 // ─── Body parser ───────────────────────────────────────────────────────────────
-app.use(express.json({ limit: '25mb' }))
+app.use(express.json({ limit: '1mb' }))
 
 // ─── Arquivos estáticos ────────────────────────────────────────────────────────
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')))
@@ -37,6 +38,9 @@ app.use(requestLogger)
 // ─── Migrações ao iniciar ─────────────────────────────────────────────────────
 ensureContactColumns().catch((error) => {
   console.error('Erro ao aplicar migrações:', error)
+})
+initCrmTables().catch((error) => {
+  console.error('Erro ao inicializar tabelas CRM:', error)
 })
 
 // ─── Rotas públicas ───────────────────────────────────────────────────────────

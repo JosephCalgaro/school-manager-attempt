@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { getLeads, createLead, updateLead, deleteLead, getActivities, createActivity, toggleActivity, archiveEnrolled, archiveLost, getRecentFeed } from '../controllers/crmController.js'
+import { getLeads, createLead, updateLead, deleteLead, getActivities, createActivity, toggleActivity, archiveEnrolled, archiveLost, getRecentFeed, getFunnelMetrics, checkDuplicate, getArchivedLeads, reactivateLead, getCustomFields, createCustomField, updateCustomField, deleteCustomField, getLeadFieldValues, upsertLeadFieldValues } from '../controllers/crmController.js'
 import {
   getAllStudents, getStudentDetails, createStudent, updateStudentDetails,
   getStudentClasses, getStudentAttendance, getStudentAssignments,
@@ -65,5 +65,15 @@ router.patch('/crm/activities/:actId/toggle',    toggleActivity)
 router.post('/crm/archive-enrolled',             archiveEnrolled)
 router.post('/crm/archive-lost',                 archiveLost)
 router.get('/crm/feed',                          getRecentFeed)
+router.get('/crm/funnel',                        getFunnelMetrics)
+router.get('/crm/check-duplicate',               checkDuplicate)
+router.get('/crm/archived',                      getArchivedLeads)
+router.post('/crm/leads/:id/reactivate',         reactivateLead)
+router.get('/crm/custom-fields',                 getCustomFields)
+router.post('/crm/custom-fields',                createCustomField)
+router.put('/crm/custom-fields/:fieldId',        updateCustomField)
+router.delete('/crm/custom-fields/:fieldId',     deleteCustomField)
+router.get('/crm/leads/:id/field-values',        getLeadFieldValues)
+router.put('/crm/leads/:id/field-values',        upsertLeadFieldValues)
 
 export default router

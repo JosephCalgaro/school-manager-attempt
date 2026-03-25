@@ -26,7 +26,9 @@ function maybeRotate() {
 function writeLog(entry) {
   maybeRotate()
   const line = JSON.stringify(entry) + '\n'
-  fs.appendFileSync(LOG_FILE, line, 'utf8')
+  fs.appendFile(LOG_FILE, line, 'utf8', err => {
+    if (err) console.error('[logger] Falha ao escrever log:', err.message)
+  })
 }
 
 // ─── Logger de requisições HTTP ───────────────────────────────────────────────

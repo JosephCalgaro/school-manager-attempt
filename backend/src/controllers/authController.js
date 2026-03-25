@@ -5,7 +5,7 @@ import { recordFailedLogin, clearLoginAttempts } from '../middlewares/rateLimite
 
 const JWT_SECRET = process.env.JWT_SECRET
 if (!JWT_SECRET) throw new Error('JWT_SECRET não definido no .env — servidor não pode iniciar com segurança.')
-const TOKEN_EXPIRES_IN = '2h'
+const TOKEN_EXPIRES_IN = process.env.TOKEN_EXPIRES_IN || '8h'
 
 function getIp(req) {
   return req.headers['x-forwarded-for']?.split(',')[0].trim()

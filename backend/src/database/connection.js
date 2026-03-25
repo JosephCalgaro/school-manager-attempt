@@ -21,7 +21,7 @@ const pool = mysql.createPool({
     // Faz node esperar conexão ficar livre se todas estiverem ocupadas
     waitForConnections: true,
     // Numero maximo de conexões simultaneas
-    connectionLimit: 20,
+    connectionLimit: Number(process.env.DB_POOL_LIMIT) || 10,
     // Fila de requisições (0 = sem limites)
     queueLimit: 0,
     // Retorna DATE/DATETIME como strings (evita conversão para Date JS + timezone bugs)
