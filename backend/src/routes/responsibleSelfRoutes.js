@@ -2,7 +2,6 @@ import express from 'express'
 import { authenticate } from '../middlewares/auth.js'
 import {
   isResponsible,
-  getMyProfile,
   getMyStudents,
   getMyStudentClasses,
   getMyStudentClassDetails,
@@ -15,7 +14,7 @@ const router = express.Router()
 // Todas as rotas exigem login + role RESPONSIBLE
 router.use(authenticate, isResponsible)
 
-router.get('/profile',              getMyProfile)
+router.get('/profile', getMyProfileWithStudent)
 router.get('/profile-with-student', getMyProfileWithStudent)
 router.get('/students',             getMyStudents)
 router.get('/classes',              getMyStudentClasses)

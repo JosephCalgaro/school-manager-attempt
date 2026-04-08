@@ -13,7 +13,7 @@ import adminRoutes           from './routes/adminRoutes.js'
 import teacherRoutes         from './routes/teacherRoutes.js'
 import secretaryRoutes       from './routes/secretaryRoutes.js'
 import studentSelfRoutes     from './routes/studentSelfRoutes.js'
-import responsibleSelfRoutes from './routes/resposibleSelfRoutes.js'
+import responsibleSelfRoutes from './routes/responsibleSelfRoutes.js'
 import schoolsRoutes         from './routes/schoolsRoutes.js'
 import saasRoutes            from './routes/saasRoutes.js'
 

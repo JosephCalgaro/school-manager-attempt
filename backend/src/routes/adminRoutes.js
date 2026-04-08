@@ -105,6 +105,7 @@ router.post('/inventory/items/:id/movements',     registerMovement)
 // CRM
 router.get('/crm/leads',                      getLeads)
 router.post('/crm/leads',                     createLead)
+router.get('/crm/leads/:id',                  getLeadById)
 router.put('/crm/leads/:id',                  updateLead)
 router.delete('/crm/leads/:id',               deleteLead)
 router.get('/crm/leads/:id/activities',       getActivities)

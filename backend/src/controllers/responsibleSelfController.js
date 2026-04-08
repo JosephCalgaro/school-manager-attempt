@@ -7,18 +7,6 @@ export function isResponsible(req, res, next) {
   next()
 }
 
-export async function getMyProfile(req, res) {
-  try {
-    const [rows] = await pool.query(
-      `SELECT id, full_name, email, phone, cpf, rg, birth_date, address
-       FROM responsibles WHERE id = ? AND school_id = ?`,
-      [req.userId, req.schoolId]
-    )
-    if (!rows.length) return res.status(404).json({ message: 'Responsável não encontrado' })
-    res.json(rows[0])
-  } catch (err) { res.status(500).json({ message: 'Erro ao buscar perfil' }) }
-}
-
 export async function getMyProfileWithStudent(req, res) {
   try {
     const [rows] = await pool.query(

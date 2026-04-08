@@ -263,12 +263,9 @@ async function ensureSaasOwnerRole() {
   console.log('[migration] Role SAAS_OWNER adicionado ao ENUM de users')
 }
 
-// ─── Colunas is_temp / temp_expires_at (legado — mantidas para não quebrar banco existente) ──
-// Não são mais usadas pela lógica de impersonação (token-only), mas preservadas para compatibilidade.
-async function ensureTempAdminColumns() {
-  await addColumnIfMissing('users', 'is_temp         TINYINT(1) NOT NULL DEFAULT 0')
-  await addColumnIfMissing('users', 'temp_expires_at DATETIME   NULL')
-}
+// ─── Colunas is_temp / temp_expires_at (legado — removida da inicialização)
+// A impersonação é 100% baseada no JWT; estas colunas no banco não são mais lidas.
+// A função é mantida aqui apenas para referência histórica, mas não é mais chamada.
 
 // ─── EXPORT PRINCIPAL ─────────────────────────────────────────────────────────
 export async function ensureContactColumns() {
@@ -287,7 +284,6 @@ export async function ensureContactColumns() {
   await ensurePerSchoolUniqueConstraints() // unique (email+school_id)
   await ensureSchoolForeignKeys()          // FK school_id → schools
   await ensureSaasOwnerRole()              // ENUM SAAS_OWNER em users.role
-  await ensureTempAdminColumns()           // is_temp + temp_expires_at
   await ensureReportColumns()
   console.log('[migration] Todas as migrações aplicadas com sucesso')
 }

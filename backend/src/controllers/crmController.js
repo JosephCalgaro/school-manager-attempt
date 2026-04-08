@@ -56,6 +56,7 @@ async function ensureCrmTables() {
       description  TEXT NOT NULL,
       scheduled_at DATETIME NULL,
       done         TINYINT(1) NOT NULL DEFAULT 0,
+      done_note    TEXT NULL,
       created_by   INT NULL,
       created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_crm_act_lead  (lead_id),
@@ -104,6 +105,17 @@ async function ensureCrmTables() {
     )
   `)
 
+  const activityCols = [
+    ['done_note', 'TEXT NULL'],
+  ]
+  for (const [col, def] of activityCols) {
+    const [r] = await pool.query(
+      `SELECT 1 FROM information_schema.columns
+       WHERE table_schema=DATABASE() AND table_name='crm_activities' AND column_name=? LIMIT 1`, [col]
+    )
+    if (!r.length) await pool.query(`ALTER TABLE crm_activities ADD COLUMN \`${col}\` ${def}`)
+  }
+
   const newCols = [
     ['archived',                 'TINYINT(1) NOT NULL DEFAULT 0'],
     ['school_id',                'INT NOT NULL DEFAULT 1'],
@@ -116,6 +128,8 @@ async function ensureCrmTables() {
     ['expected_enrollment_date', 'DATE NULL'],
     ['cpf',                      'VARCHAR(20) NULL'],
     ['rg',                       'VARCHAR(20) NULL'],
+    ['cpf_normalized',           'VARCHAR(14) NULL COMMENT "CPF só dígitos, para busca indexada"'],
+    ['phone_normalized',         'VARCHAR(20) NULL COMMENT "Telefone só dígitos, para busca indexada"'],
   ]
   for (const [col, def] of newCols) {
     const [r] = await pool.query(
@@ -135,6 +149,28 @@ async function ensureCrmTables() {
     )
     if (!r.length) await pool.query(`ALTER TABLE crm_leads ADD COLUMN \`${col}\` ${def}`)
   }
+
+  // Índices nas colunas normalizadas (cpf_normalized, phone_normalized)
+  const newIndexes = [
+    ['idx_cpf_norm',   'cpf_normalized'],
+    ['idx_phone_norm', 'phone_normalized'],
+  ]
+  for (const [idxName, colName] of newIndexes) {
+    const [r] = await pool.query(
+      `SELECT 1 FROM information_schema.statistics
+       WHERE table_schema=DATABASE() AND table_name='crm_leads' AND index_name=? LIMIT 1`, [idxName]
+    )
+    if (!r.length) await pool.query(`ALTER TABLE crm_leads ADD INDEX \`${idxName}\` (\`${colName}\`)`)
+  }
+
+  // Popula colunas normalizadas para registros já existentes (migração única)
+  await pool.query(`
+    UPDATE crm_leads
+    SET cpf_normalized   = REGEXP_REPLACE(cpf,   '[^0-9]', ''),
+        phone_normalized = REGEXP_REPLACE(phone, '[^0-9]', '')
+    WHERE (cpf_normalized IS NULL AND cpf IS NOT NULL)
+       OR (phone_normalized IS NULL AND phone IS NOT NULL)
+  `)
 }
 
 // ─── Score ────────────────────────────────────────────────────────────────────
@@ -216,10 +252,10 @@ const LEAD_AGG_SQL = `
 
 export async function checkDuplicate(req, res) {
   const sid = req.schoolId
-
-    // Remove tudo que não é dígito (ou letra, para RG com letras)
-    const digitsOnly  = v => v?.replace(/\D/g, '')       || null
-    const alphaDigits = v => v?.replace(/[^a-zA-Z0-9]/g, '') || null
+  const { cpf, rg, phone, exclude_id } = req.query
+  try {
+    const digitsOnly  = v => v?.replace(/\D/g, '')              || null
+    const alphaDigits = v => v?.replace(/[^a-zA-Z0-9]/g, '')   || null
 
     const cpfClean   = digitsOnly(cpf)
     const rgClean    = alphaDigits(rg)
@@ -227,18 +263,13 @@ export async function checkDuplicate(req, res) {
 
     const conditions = []; const params = []
 
-    // REGEXP_REPLACE disponível no MySQL 8.0 — remove todos os não-dígitos antes de comparar
-    if (cpfClean)   {
-      conditions.push("REGEXP_REPLACE(cpf,   '[^0-9]',   '') = ?")
-      params.push(cpfClean)
-    }
+    // Usa colunas normalizadas com índice — sem REGEXP_REPLACE em runtime
+    if (cpfClean)   { conditions.push('cpf_normalized = ?');           params.push(cpfClean) }
+    if (phoneClean) { conditions.push('phone_normalized LIKE ?');      params.push(`%${phoneClean}%`) }
+    // RG ainda não tem coluna normalizada dedicada — mantém REGEXP_REPLACE apenas para ele
     if (rgClean)    {
-      conditions.push("REGEXP_REPLACE(rg,    '[^a-zA-Z0-9]', '') = ?")
+      conditions.push("REGEXP_REPLACE(rg, '[^a-zA-Z0-9]', '') = ?")
       params.push(rgClean)
-    }
-    if (phoneClean) {
-      conditions.push("REGEXP_REPLACE(phone, '[^0-9]',   '') LIKE ?")
-      params.push(`%${phoneClean}%`)
     }
 
     if (!conditions.length) return res.json({ duplicates: [] })
@@ -274,7 +305,13 @@ export async function getLeads(req, res) {
   const sid = req.schoolId
   try {
     await ensureCrmTables()
-    const { assigned_to, source, temperature, search } = req.query
+    const { assigned_to, source, temperature, search, page, limit } = req.query
+
+    // Paginação: page (1-based), limit (padrão 100, máx 500)
+    const pageNum  = Math.max(1, parseInt(page)  || 1)
+    const pageSize = Math.min(500, Math.max(1, parseInt(limit) || 100))
+    const offset   = (pageNum - 1) * pageSize
+
     let where = 'l.school_id = ? AND l.archived = 0'
     const params = [sid]
     if (assigned_to) { where += ' AND l.assigned_to = ?';  params.push(assigned_to) }
@@ -284,8 +321,26 @@ export async function getLeads(req, res) {
       where += ' AND (l.name LIKE ? OR l.phone LIKE ? OR l.email LIKE ? OR l.student_name LIKE ? OR l.cpf LIKE ? OR l.rg LIKE ?)'
       const t = `%${search}%`; params.push(t, t, t, t, t, t)
     }
-    const [rows] = await pool.query(`${LEAD_AGG_SQL} WHERE ${where} ORDER BY l.score DESC, l.updated_at DESC`, params)
-    res.json(rows)
+
+    // Total para metadados de paginação
+    const [[{ total }]] = await pool.query(
+      `SELECT COUNT(*) AS total FROM crm_leads l WHERE ${where}`, params
+    )
+
+    const [rows] = await pool.query(
+      `${LEAD_AGG_SQL} WHERE ${where} ORDER BY l.score DESC, l.updated_at DESC LIMIT ? OFFSET ?`,
+      [...params, pageSize, offset]
+    )
+
+    res.json({
+      data:       rows,
+      pagination: {
+        page:       pageNum,
+        limit:      pageSize,
+        total:      Number(total),
+        totalPages: Math.ceil(Number(total) / pageSize),
+      },
+    })
   } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao buscar leads' }) }
 }
 
@@ -324,21 +379,19 @@ export async function reactivateLead(req, res) {
     }
     const prevStage = lead.stage
     await pool.query(
-      `UPDATE crm_leads SET stage='CONTATO', archived=0, lost_at=NULL, lost_reason=NULL,
-       lost_reason_type=NULL, follow_up_at=NULL, updated_at=NOW() WHERE id=?`, [id]
+      "UPDATE crm_leads SET stage='CONTATO', archived=0, lost_at=NULL, lost_reason=NULL, lost_reason_type=NULL, follow_up_at=NULL, updated_at=NOW() WHERE id=?",
+      [id]
     )
+    const reactivateNote = 'Reativado do estagio ' + prevStage
     await pool.query(
-      `INSERT INTO crm_stage_logs (lead_id, school_id, from_stage, to_stage, changed_by, note)
-       VALUES (?, ?, ?, 'CONTATO', ?, ?)`,
-      [id, sid, prevStage, req.userId, 'Lead reativado — retornando ao pipeline']
+      "INSERT INTO crm_stage_logs (lead_id, school_id, from_stage, to_stage, changed_by, note) VALUES (?, ?, ?, 'REATIVACAO', ?, ?)",
+      [id, sid, prevStage, req.userId, reactivateNote]
     )
     await recalcScore(id)
     const [[updated]] = await pool.query('SELECT * FROM crm_leads WHERE id=?', [id])
     res.json(updated)
   } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao reativar lead' }) }
 }
-
-// ─── createLead ───────────────────────────────────────────────────────────────
 
 export async function createLead(req, res) {
   const sid = req.schoolId
@@ -348,14 +401,18 @@ export async function createLead(req, res) {
             notes, assigned_to, tags, expected_enrollment_date } = req.body || {}
     if (!name?.trim()) return res.status(400).json({ error: 'Nome é obrigatório' })
 
+    const cpfNorm   = cpf   ? cpf.replace(/\D/g, '')   : null
+    const phoneNorm = phone ? phone.replace(/\D/g, '') : null
+
     const [r] = await pool.query(
       `INSERT INTO crm_leads
        (school_id, name, phone, email, cpf, rg, student_name, age_range, source,
-        notes, assigned_to, tags, expected_enrollment_date)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        notes, assigned_to, tags, expected_enrollment_date, cpf_normalized, phone_normalized)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [sid, name.trim(), phone||null, email||null, cpf||null, rg||null,
        student_name||null, age_range||null, source||'OUTRO', notes||null,
-       assigned_to||req.userId, tags||null, expected_enrollment_date||null]
+       assigned_to||req.userId, tags||null, expected_enrollment_date||null,
+       cpfNorm, phoneNorm]
     )
     await pool.query(
       `INSERT INTO crm_stage_logs (lead_id, school_id, from_stage, to_stage, changed_by, note)
@@ -390,6 +447,9 @@ export async function updateLead(req, res) {
       if (req.body[key] !== undefined) { fields.push(`\`${key}\` = ?`); values.push(req.body[key] || null) }
     }
     if (!fields.length) return res.status(400).json({ error: 'Nenhum campo para atualizar' })
+    // Mantém colunas normalizadas sincronizadas
+    if (req.body.cpf  !== undefined) { fields.push('cpf_normalized = ?');   values.push(req.body.cpf   ? req.body.cpf.replace(/\D/g, '')   : null) }
+    if (req.body.phone !== undefined) { fields.push('phone_normalized = ?'); values.push(req.body.phone ? req.body.phone.replace(/\D/g, '') : null) }
     if (req.body.stage === 'MATRICULADO') fields.push('enrolled_at = IFNULL(enrolled_at, NOW())')
     if (req.body.stage === 'PERDIDO')     fields.push('lost_at = IFNULL(lost_at, NOW())')
     await pool.query(`UPDATE crm_leads SET ${fields.join(', ')} WHERE id=? AND school_id=?`, [...values, id, sid])
@@ -541,14 +601,18 @@ export async function upsertLeadFieldValues(req, res) {
     }
 
     const changedFields = []
-    for (const { field_id, value } of validValues) {
-      const fid = Number(field_id)
+    if (validValues.length) {
+      // Batch UPSERT — 1 query ao invés de N INSERTs individuais
+      const batchRows = validValues.map(({ field_id, value }) => [leadId, sid, Number(field_id), value || null])
       await pool.query(
         `INSERT INTO crm_lead_field_values (lead_id, school_id, field_id, value)
-         VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE value=VALUES(value)`,
-        [leadId, sid, fid, value || null]
+         VALUES ? ON DUPLICATE KEY UPDATE value=VALUES(value)`,
+        [batchRows]
       )
-      if (existingMap[fid] === undefined || existingMap[fid] !== value) changedFields.push(fid)
+      for (const { field_id, value } of validValues) {
+        const fid = Number(field_id)
+        if (existingMap[fid] === undefined || existingMap[fid] !== value) changedFields.push(fid)
+      }
     }
 
     if (changedFields.length) {
@@ -624,13 +688,31 @@ export async function toggleActivity(req, res) {
   const actId = Number(req.params.actId)
   if (!Number.isInteger(actId)) return res.status(400).json({ error: 'ID inválido' })
   try {
-    await pool.query('UPDATE crm_activities SET done = NOT done WHERE id = ?', [actId])
+    const [[act]] = await pool.query('SELECT * FROM crm_activities WHERE id = ?', [actId])
+    if (!act) return res.status(404).json({ error: 'Atividade não encontrada' })
+
+    const isDone = Number(act.done) === 1
+    const hasNote = Object.prototype.hasOwnProperty.call(req.body || {}, 'done_note')
+    if (!isDone) {
+      const note = (req.body?.done_note || '').trim()
+      if (!note) return res.status(400).json({ error: 'Resultado é obrigatório' })
+      await pool.query('UPDATE crm_activities SET done=1, done_note=? WHERE id=?', [note, actId])
+      await pool.query(
+        "INSERT INTO crm_stage_logs (lead_id, school_id, from_stage, to_stage, changed_by, note) VALUES (?, ?, NULL, 'ATIVIDADE_FEITA', ?, ?)",
+        [act.lead_id, req.schoolId, req.userId, 'Atividade concluída: ' + note.slice(0,120)]
+      )
+    } else if (hasNote) {
+      const note = (req.body?.done_note || '').trim()
+      if (!note) return res.status(400).json({ error: 'Resultado é obrigatório' })
+      await pool.query('UPDATE crm_activities SET done_note=? WHERE id=?', [note, actId])
+    } else {
+      await pool.query('UPDATE crm_activities SET done=0, done_note=NULL WHERE id=?', [actId])
+    }
     const [rows] = await pool.query('SELECT * FROM crm_activities WHERE id = ?', [actId])
     await recalcScore(rows[0].lead_id)
     res.json(rows[0])
   } catch (err) { res.status(500).json({ error: 'Erro' }) }
 }
-
 // ─── getFunnelMetrics ─────────────────────────────────────────────────────────
 // Funil baseado em coorte de jornada:
 // "Dos X que entraram no estágio N, quantos avançaram para o estágio N+1?"
@@ -826,3 +908,7 @@ export async function archiveLost(req, res) {
     res.json({ archived: r.affectedRows })
   } catch (err) { res.status(500).json({ error: 'Erro ao arquivar' }) }
 }
+
+
+
+

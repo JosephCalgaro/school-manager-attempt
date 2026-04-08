@@ -371,29 +371,6 @@ async function getClassStudents(classId) {
   }))
 }
 
-async function getClassGrades(classId) {
-  try {
-    const gradeCols = await getGradesColumns()
-    if (!gradeCols.student || !gradeCols.assignment || !gradeCols.score) {
-      return []
-    }
-
-    const [rows] = await pool.query(
-      `SELECT g.\`${gradeCols.student}\` AS studentId, g.\`${gradeCols.assignment}\` AS assignmentId, g.\`${gradeCols.score}\` AS score
-       FROM grades g
-       JOIN assignments a ON a.id = g.\`${gradeCols.assignment}\`
-       WHERE a.class_id = ?`,
-      [classId]
-    )
-    return rows
-  } catch (error) {
-    if (error.code === 'ER_NO_SUCH_TABLE' || error.code === 'ER_BAD_FIELD_ERROR') {
-      return []
-    }
-    throw error
-  }
-}
-
 async function getClassNotes(classId) {
   try {
     await ensureStudentNotesTable()

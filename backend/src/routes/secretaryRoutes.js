@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { getLeads, createLead, updateLead, deleteLead, getActivities, createActivity, toggleActivity, archiveEnrolled, archiveLost, getRecentFeed, getFunnelMetrics, checkDuplicate, getArchivedLeads, reactivateLead, getCustomFields, createCustomField, updateCustomField, deleteCustomField, getLeadFieldValues, upsertLeadFieldValues } from '../controllers/crmController.js'
+import { getLeads, getLeadById, createLead, updateLead, deleteLead, getActivities, createActivity, toggleActivity, archiveEnrolled, archiveLost, getRecentFeed, getFunnelMetrics, checkDuplicate, getArchivedLeads, reactivateLead, getCustomFields, createCustomField, updateCustomField, deleteCustomField, getLeadFieldValues, upsertLeadFieldValues } from '../controllers/crmController.js'
 import {
   getAllStudents, getStudentDetails, createStudent, updateStudentDetails,
   getStudentClasses, getStudentAttendance, getStudentAssignments,
@@ -57,6 +57,7 @@ router.get('/responsibles/:id/students',       getStudentsByResponsibleId)
 // CRM
 router.get('/crm/leads',                         getLeads)
 router.post('/crm/leads',                        createLead)
+router.get('/crm/leads/:id',                     getLeadById)
 router.put('/crm/leads/:id',                     updateLead)
 router.delete('/crm/leads/:id',                  deleteLead)
 router.get('/crm/leads/:id/activities',          getActivities)

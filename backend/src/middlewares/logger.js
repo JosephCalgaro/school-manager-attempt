@@ -2,6 +2,7 @@
 // Logs every request with: timestamp, method, path, status, duration, schoolId, userId, ip
 
 import fs from 'fs'
+import fsPromises from 'fs/promises'
 import path from 'path'
 
 const LOG_DIR  = path.resolve(process.cwd(), 'logs')
@@ -11,23 +12,23 @@ const MAX_BYTES = 10 * 1024 * 1024  // 10 MB — rotaciona automaticamente
 // Cria o diretório de logs se não existir
 if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true })
 
-// Rotação simples: renomeia app.log → app.1.log quando passa de 10MB
-function maybeRotate() {
+// Rotação simples: renomeia app.log → app.1.log quando passa de 10MB (assíncrono)
+async function maybeRotate() {
   try {
-    const stat = fs.statSync(LOG_FILE)
+    const stat = await fsPromises.stat(LOG_FILE)
     if (stat.size >= MAX_BYTES) {
       const rotated = path.join(LOG_DIR, 'app.1.log')
-      if (fs.existsSync(rotated)) fs.unlinkSync(rotated)
-      fs.renameSync(LOG_FILE, rotated)
+      try { await fsPromises.unlink(rotated) } catch { /* não existe, ok */ }
+      await fsPromises.rename(LOG_FILE, rotated)
     }
   } catch { /* arquivo pode não existir ainda */ }
 }
 
-function writeLog(entry) {
-  maybeRotate()
+async function writeLog(entry) {
+  await maybeRotate()
   const line = JSON.stringify(entry) + '\n'
-  fs.appendFile(LOG_FILE, line, 'utf8', err => {
-    if (err) console.error('[logger] Falha ao escrever log:', err.message)
+  fsPromises.appendFile(LOG_FILE, line, 'utf8').catch(err => {
+    console.error('[logger] Falha ao escrever log:', err.message)
   })
 }
 
@@ -88,12 +89,17 @@ export function logEvent(level = 'INFO', event, data = {}) {
 }
 
 // ─── Endpoint para o SaaS owner consultar logs ────────────────────────────────
-export function getRecentLogs(req, res) {
+export async function getRecentLogs(req, res) {
   try {
     const { limit = 200, level, school_id } = req.query
-    if (!fs.existsSync(LOG_FILE)) return res.json([])
+    let raw
+    try {
+      raw = await fsPromises.readFile(LOG_FILE, 'utf8')
+    } catch {
+      return res.json([])
+    }
 
-    const lines = fs.readFileSync(LOG_FILE, 'utf8')
+    const lines = raw
       .split('\n')
       .filter(Boolean)
       .slice(-Number(limit))
