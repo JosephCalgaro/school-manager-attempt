@@ -310,6 +310,7 @@ async function getClassAssignments(classId, totalStudents = 0) {
     }))
   } catch (error) {
     if (error.code !== 'ER_BAD_FIELD_ERROR') {
+      console.error('Erro ao buscar atribuições:', error)
       throw error
     }
 
@@ -361,6 +362,7 @@ async function getClassStudents(classId) {
     students = rows
   } catch (error) {
     if (error.code === 'ER_NO_SUCH_TABLE') return []
+    console.error('Erro ao buscar alunos da turma:', error)
     throw error
   }
 
@@ -378,6 +380,7 @@ async function getClassStudents(classId) {
     attendanceMap = new Map(attendanceRows.map((row) => [Number(row.studentId), Number(row.attendanceRate || 0)]))
   } catch (error) {
     if (!['ER_NO_SUCH_TABLE', 'ER_BAD_FIELD_ERROR'].includes(error.code)) {
+      console.error('Erro ao calcular taxa de presença:', error)
       throw error
     }
   }
@@ -400,6 +403,7 @@ async function getClassNotes(classId) {
     return rows
   } catch (error) {
     if (error.code === 'ER_NO_SUCH_TABLE') return []
+    console.error('Erro ao buscar notas dos alunos:', error)
     throw error
   }
 }
@@ -521,7 +525,9 @@ export async function getTeacherClassById(req, res) {
       )
       totalStudents = Number(studentCountRows[0]?.totalStudents || 0)
     } catch (error) {
-      if (error.code !== 'ER_NO_SUCH_TABLE') throw error
+      if (error.code !== 'ER_NO_SUCH_TABLE')
+      console.error('Erro ao contar alunos da turma:', error)
+      throw error
     }
 
     let attendanceRate = 0
@@ -536,6 +542,7 @@ export async function getTeacherClassById(req, res) {
       attendanceRate = Number(attendanceRows[0]?.attendanceRate || 0)
     } catch (error) {
       if (!['ER_NO_SUCH_TABLE', 'ER_BAD_FIELD_ERROR'].includes(error.code)) {
+        console.error('Erro ao calcular taxa de presença:', error)
         throw error
       }
     }
@@ -721,6 +728,7 @@ export async function upsertClassGrade(req, res) {
       )
     } catch (error) {
       if (error.code !== 'ER_BAD_FIELD_ERROR') throw error
+      console.error('Erro ao buscar atribuições:', error)
       ;[assignmentRows] = await pool.query(
         'SELECT id, NULL AS maxScore FROM assignments WHERE id = ? AND class_id = ?',
         [assignmentId, classId]
@@ -955,6 +963,7 @@ export async function createClassAssignment(req, res) {
       )
     } catch (error) {
       if (error.code !== 'ER_BAD_FIELD_ERROR') throw error
+      console.error('Erro ao criar atividade:', error)
       ;[result] = await pool.query(
         `INSERT INTO assignments (title, due_date, description, class_id)
          VALUES (?, ?, ?, ?)`,
@@ -1040,6 +1049,7 @@ export async function updateClassAssignment(req, res) {
         )
       } catch (error) {
         if (error.code !== 'ER_BAD_FIELD_ERROR') throw error
+        console.error('Erro ao atualizar atividade:', error)
         const basicFields = []
         const basicValues = []
         fields.forEach((field, index) => {

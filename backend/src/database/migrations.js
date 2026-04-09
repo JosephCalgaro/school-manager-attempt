@@ -210,6 +210,7 @@ async function ensureSchoolForeignKeys() {
         console.log(`[migration] FK ${fkName} adicionada`)
       } catch (e) {
         // Ignora se já existe com outro nome
+        console.error(`[migration] FK ${fkName}: ${e.message}`)
         if (!e.message.includes('Duplicate')) console.warn(`[migration] FK ${fkName}: ${e.message}`)
       }
     }

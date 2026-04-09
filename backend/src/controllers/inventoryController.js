@@ -228,5 +228,8 @@ export async function registerMovement(req, res) {
     } finally {
       conn.release()
     }
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao registrar movimentação' }) }
+  } catch (err) { 
+    console.error('Erro ao registrar movimentação:', err)
+    res.status(500).json({ error: 'Erro ao registrar movimentação' }) 
+  }
 }

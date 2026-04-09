@@ -41,7 +41,10 @@ export async function getMyProfileWithStudent(req, res) {
     )
     if (!rows.length) return res.status(404).json({ message: 'Responsável não encontrado' })
     res.json(rows[0])
-  } catch (err) { res.status(500).json({ message: 'Erro ao buscar perfil' }) }
+  } catch (err) { 
+    console.error('Erro ao buscar perfil:', err)
+    res.status(500).json({ message: 'Erro ao buscar perfil' }) 
+  }
 }
 
 /**
@@ -60,7 +63,10 @@ export async function getMyStudents(req, res) {
       [req.userId, req.schoolId]
     )
     res.json(rows)
-  } catch (err) { res.status(500).json({ message: 'Erro ao buscar alunos' }) }
+  } catch (err) { 
+    console.error('Erro ao buscar alunos:', err)
+    res.status(500).json({ message: 'Erro ao buscar alunos' }) 
+  }
 }
 
 /**
@@ -83,7 +89,10 @@ export async function getMyStudentClasses(req, res) {
       [req.userId, req.schoolId, req.schoolId]
     )
     res.json(rows)
-  } catch (err) { res.status(500).json({ message: 'Erro ao buscar turmas dos alunos' }) }
+  } catch (err) { 
+    console.error('Erro ao buscar turmas dos alunos:', err)
+    res.status(500).json({ message: 'Erro ao buscar turmas dos alunos' }) 
+  }
 }
 
 /**
@@ -110,7 +119,10 @@ export async function getMyStudentClassDetails(req, res) {
     )
     if (!rows.length) return res.status(404).json({ message: 'Turma não encontrada.' })
     res.json(rows[0])
-  } catch (err) { res.status(500).json({ message: 'Erro ao buscar detalhes da turma' }) }
+  } catch (err) { 
+    console.error('Erro ao buscar detalhes da turma:', err)
+    res.status(500).json({ message: 'Erro ao buscar detalhes da turma' }) 
+  }
 }
 
 /**
@@ -134,5 +146,8 @@ export async function getMyStudentAssignments(req, res) {
       [req.userId, req.schoolId, req.schoolId]
     )
     res.json(rows)
-  } catch (err) { res.status(500).json({ message: 'Erro ao buscar atividades dos alunos' }) }
+  } catch (err) { 
+    console.error('Erro ao buscar atividades dos alunos:', err)
+    res.status(500).json({ message: 'Erro ao buscar atividades dos alunos' }) 
+  }
 }

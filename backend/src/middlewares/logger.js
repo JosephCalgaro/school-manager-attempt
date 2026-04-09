@@ -114,6 +114,7 @@ export async function getRecentLogs(req, res) {
 
     res.json(filtered)
   } catch (err) {
+    console.error('Erro ao ler logs:', err)
     res.status(500).json({ error: 'Erro ao ler logs' })
   }
 }

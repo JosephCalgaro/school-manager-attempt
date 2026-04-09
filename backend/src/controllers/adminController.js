@@ -232,7 +232,10 @@ export const getStudentClasses = async (req, res) => {
       [req.params.id, sid]
     )
     res.json(classes)
-  } catch (error) { res.status(500).json({ message: 'Erro ao buscar turmas do aluno' }) }
+  } catch (error) { 
+    console.error('Erro ao buscar turmas do aluno:', error)
+    res.status(500).json({ message: 'Erro ao buscar turmas do aluno' })
+  }
 }
 
 /**
@@ -268,7 +271,10 @@ export const getStudentAttendance = async (req, res) => {
     const total = attendance.length; const present = attendance.filter(a => a.present).length
     const percentage = total > 0 ? ((present / total) * 100).toFixed(2) : 0
     res.json({ attendance, statistics: { total, present, absent: total - present, percentage: `${percentage}%` } })
-  } catch (error) { res.status(500).json({ message: 'Erro ao buscar frequência do aluno' }) }
+  } catch (error) { 
+    console.error('Erro ao buscar frequência do aluno:', error)
+    res.status(500).json({ message: 'Erro ao buscar frequência do aluno' })
+  }
 }
 
 /**
@@ -297,7 +303,10 @@ export const getStudentAssignments = async (req, res) => {
       [sid, id, id]
     )
     res.json(assignments)
-  } catch (error) { res.status(500).json({ message: 'Erro ao buscar atividades do aluno' }) }
+  } catch (error) { 
+    console.error('Erro ao buscar atividades do aluno:', error)
+    res.status(500).json({ message: 'Erro ao buscar atividades do aluno' })
+  }
 }
 
 /**
@@ -736,7 +745,9 @@ export const getClassStudentsList = async (req, res) => {
       [req.params.id, sid]
     )
     res.json(students)
-  } catch (error) { res.status(500).json({ message: 'Erro ao listar alunos da turma' }) }
+  } catch (error) { 
+    console.error('Erro ao listar alunos da turma:', error)
+    res.status(500).json({ message: 'Erro ao listar alunos da turma' }) }
 }
 
 /**
@@ -761,7 +772,10 @@ export const addStudentToClass = async (req, res) => {
     if (!stu) return res.status(404).json({ message: 'Aluno não encontrado' })
     await pool.query('INSERT IGNORE INTO class_students (class_id, student_id) VALUES (?, ?)', [req.params.id, student_id])
     res.json({ message: 'Aluno adicionado à turma' })
-  } catch (error) { res.status(500).json({ message: 'Erro ao adicionar aluno' }) }
+  } catch (error) { 
+    console.error('Erro ao adicionar aluno:', error)
+    res.status(500).json({ message: 'Erro ao adicionar aluno' }) 
+  }
 }
 
 /**

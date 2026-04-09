@@ -28,7 +28,10 @@ export async function getMySchool(req, res) {
     )
     if (!rows.length) return res.status(404).json({ error: 'Escola não encontrada' })
     res.json(rows[0])
-  } catch (err) { res.status(500).json({ error: 'Erro ao buscar escola' }) }
+  } catch (err) { 
+    console.error('Erro ao buscar escola:', err)
+    res.status(500).json({ error: 'Erro ao buscar escola' }) 
+  }
 }
 
 // ─── Atualizar escola própria ─────────────────────────────────────────────────
@@ -50,7 +53,10 @@ export async function updateMySchool(req, res) {
     if (!fields.length) return res.status(400).json({ error: 'Nenhum campo para atualizar' })
     await pool.query(`UPDATE schools SET ${fields.join(', ')} WHERE id = ?`, [...values, req.schoolId])
     res.json({ message: 'Escola atualizada com sucesso' })
-  } catch (err) { res.status(500).json({ error: 'Erro ao atualizar escola' }) }
+  } catch (err) { 
+    console.error('Erro ao atualizar escola:', err)
+    res.status(500).json({ error: 'Erro ao atualizar escola' }) 
+  }
 }
 
 // ─── SAAS OWNER: listar todas as escolas ─────────────────────────────────────
@@ -72,7 +78,10 @@ export async function listAllSchools(req, res) {
       ORDER BY s.created_at DESC
     `)
     res.json(rows)
-  } catch (err) { res.status(500).json({ error: 'Erro ao listar escolas' }) }
+  } catch (err) { 
+    console.error('Erro ao listar escolas:', err)
+    res.status(500).json({ error: 'Erro ao listar escolas' }) 
+  }
 }
 
 // ─── SAAS OWNER: criar escola + admin (onboarding completo) ──────────────────
@@ -159,7 +168,10 @@ export async function updateSchool(req, res) {
     const [result] = await pool.query(`UPDATE schools SET ${fields.join(', ')} WHERE id = ?`, [...values, id])
     if (!result.affectedRows) return res.status(404).json({ error: 'Escola não encontrada' })
     res.json({ message: 'Escola atualizada' })
-  } catch (err) { res.status(500).json({ error: 'Erro ao atualizar escola' }) }
+  } catch (err) { 
+    console.error('Erro ao atualizar escola:', err)
+    res.status(500).json({ error: 'Erro ao atualizar escola' }) 
+  }
 }
 
 // ─── SAAS OWNER: ativar/desativar escola ──────────────────────────────────────
@@ -181,7 +193,10 @@ export async function toggleSchool(req, res) {
     await pool.query('UPDATE schools SET is_active = ? WHERE id = ?', [newStatus, id])
     logEvent('INFO', newStatus ? 'SCHOOL_ACTIVATED' : 'SCHOOL_DEACTIVATED', { schoolId: id })
     res.json({ is_active: newStatus })
-  } catch (err) { res.status(500).json({ error: 'Erro ao alterar escola' }) }
+  } catch (err) { 
+    console.error('Erro ao alterar escola:', err)
+    res.status(500).json({ error: 'Erro ao alterar escola' }) 
+  }
 }
 
 // ─── SAAS OWNER: deletar escola ───────────────────────────────────────────────

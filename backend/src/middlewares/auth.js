@@ -35,7 +35,8 @@ async function isUserActive(userId, role) {
       return false
     }
     return true
-  } catch {
+  } catch (err) {
+    console.error('Erro ao verificar status do usuário:', err)
     return true  // em caso de falha no DB, deixa passar (fail-open)
   }
 }
@@ -63,6 +64,7 @@ export async function authenticate(req, res, next) {
 
     next()
   } catch (err) {
+    console.error('Erro na autenticação:', err)
     return res.status(401).json({ error: 'Token inválido' })
   }
 }

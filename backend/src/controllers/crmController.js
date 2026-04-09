@@ -622,7 +622,10 @@ export async function getCustomFields(req, res) {
       'SELECT * FROM crm_custom_fields WHERE school_id=? ORDER BY position, id', [sid]
     )
     res.json(rows)
-  } catch (err) { res.status(500).json({ error: 'Erro ao buscar campos' }) }
+  } catch (err) { 
+    console.error('Erro ao buscar campos:', err)
+    res.status(500).json({ error: 'Erro ao buscar campos' }) 
+  }
 }
 
 /**
@@ -649,6 +652,7 @@ export async function createCustomField(req, res) {
     res.status(201).json(field)
   } catch (err) {
     if (err?.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Já existe um campo com este nome' })
+    console.error('Erro ao criar campo:', err)
     res.status(500).json({ error: 'Erro ao criar campo' })
   }
 }
@@ -677,7 +681,10 @@ export async function updateCustomField(req, res) {
     )
     const [[field]] = await pool.query('SELECT * FROM crm_custom_fields WHERE id=?', [id])
     res.json(field)
-  } catch (err) { res.status(500).json({ error: 'Erro ao atualizar campo' }) }
+  } catch (err) { 
+    console.error('Erro ao atualizar campo:', err)
+    res.status(500).json({ error: 'Erro ao atualizar campo' }) 
+  }
 }
 
 /**
@@ -693,7 +700,10 @@ export async function deleteCustomField(req, res) {
     await pool.query('DELETE FROM crm_lead_field_values WHERE field_id=?', [id])
     await pool.query('DELETE FROM crm_custom_fields WHERE id=? AND school_id=?', [id, sid])
     res.json({ message: 'Campo removido' })
-  } catch (err) { res.status(500).json({ error: 'Erro ao remover campo' }) }
+  } catch (err) { 
+    console.error('Erro ao remover campo:', err)
+    res.status(500).json({ error: 'Erro ao remover campo' }) 
+  }
 }
 
 /**
@@ -713,7 +723,10 @@ export async function getLeadFieldValues(req, res) {
        WHERE v.lead_id=? ORDER BY f.position, f.id`, [leadId]
     )
     res.json(rows)
-  } catch (err) { res.status(500).json({ error: 'Erro ao buscar valores' }) }
+  } catch (err) { 
+    console.error('Erro ao buscar valores:', err)
+    res.status(500).json({ error: 'Erro ao buscar valores' }) 
+  }
 }
 
 /**
@@ -805,7 +818,10 @@ export async function getActivities(req, res) {
        WHERE l.lead_id = ? ORDER BY l.created_at DESC`, [leadId]
     )
     res.json({ activities: acts, logs })
-  } catch (err) { res.status(500).json({ error: 'Erro ao buscar atividades' }) }
+  } catch (err) {
+    console.error('Erro ao buscar atividades:', err)
+    res.status(500).json({ error: 'Erro ao buscar atividades' }) 
+  }
 }
 
 /**
@@ -837,7 +853,10 @@ export async function createActivity(req, res) {
        LEFT JOIN users u ON u.id = a.created_by WHERE a.id = ?`, [r.insertId]
     )
     res.status(201).json(rows[0])
-  } catch (err) { res.status(500).json({ error: 'Erro ao criar atividade' }) }
+  } catch (err) { 
+    console.error('Erro ao criar atividade:', err)
+    res.status(500).json({ error: 'Erro ao criar atividade' }) 
+  }
 }
 
 /**
@@ -875,7 +894,10 @@ export async function toggleActivity(req, res) {
     )
     await recalcScore(updated.lead_id)
     res.json(updated)
-  } catch (err) { res.status(500).json({ error: 'Erro' }) }
+  } catch (err) { 
+    console.error('Erro ao atualizar atividade:', err)
+    res.status(500).json({ error: 'Erro' }) 
+  }
 }
 // ─── getFunnelMetrics ─────────────────────────────────────────────────────────
 // Funil baseado em coorte de jornada:
@@ -1056,7 +1078,10 @@ export async function getRecentFeed(req, res) {
       WHERE l.school_id=? ORDER BY l.created_at DESC LIMIT 50
     `, [sid])
     res.json(rows)
-  } catch (err) { res.status(500).json({ error: 'Erro ao buscar feed' }) }
+  } catch (err) { 
+    console.error('Erro ao buscar feed:', err)
+    res.status(500).json({ error: 'Erro ao buscar feed' }) 
+  }
 }
 
 /**
@@ -1075,7 +1100,10 @@ export async function archiveEnrolled(req, res) {
         AND (YEAR(enrolled_at)<YEAR(NOW()) OR MONTH(enrolled_at)<MONTH(NOW()))
     `, [sid])
     res.json({ archived: r.affectedRows })
-  } catch (err) { res.status(500).json({ error: 'Erro ao arquivar' }) }
+  } catch (err) { 
+    console.error('Erro ao arquivar leads matriculados:', err)
+    res.status(500).json({ error: 'Erro ao arquivar' }) 
+  }
 }
 
 /**
@@ -1094,7 +1122,10 @@ export async function archiveLost(req, res) {
         AND (YEAR(lost_at)<YEAR(NOW()) OR MONTH(lost_at)<MONTH(NOW()))
     `, [sid])
     res.json({ archived: r.affectedRows })
-  } catch (err) { res.status(500).json({ error: 'Erro ao arquivar' }) }
+  } catch (err) { 
+    console.error('Erro ao arquivar leads perdidos:', err)
+    res.status(500).json({ error: 'Erro ao arquivar' }) 
+  }
 }
 
 
