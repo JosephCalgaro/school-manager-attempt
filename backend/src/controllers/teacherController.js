@@ -512,9 +512,10 @@ export async function getTeacherClassById(req, res) {
     })
   } catch (error) {
     console.error(error)
+    const isProd = process.env.NODE_ENV === 'production'
     res.status(500).json({
       error: 'Erro ao buscar detalhes da turma',
-      details: error.message
+      ...(isProd ? {} : { details: error.message })
     })
   }
 }
@@ -888,7 +889,8 @@ export async function createClassAssignment(req, res) {
     res.status(201).json({ id: result.insertId, files: savedFiles, message: 'Atividade criada com sucesso' })
   } catch (error) {
     console.error(error)
-    res.status(500).json({ error: 'Erro ao criar atividade', details: error.message })
+    const isProd = process.env.NODE_ENV === 'production'
+    res.status(500).json({ error: 'Erro ao criar atividade', ...(isProd ? {} : { details: error.message }) })
   }
 }
 
@@ -975,7 +977,8 @@ export async function updateClassAssignment(req, res) {
     res.json({ message: 'Atividade atualizada com sucesso', files: savedFiles })
   } catch (error) {
     console.error(error)
-    res.status(500).json({ error: 'Erro ao atualizar atividade', details: error.message })
+    const isProd = process.env.NODE_ENV === 'production'
+    res.status(500).json({ error: 'Erro ao atualizar atividade', ...(isProd ? {} : { details: error.message }) })
   }
 }
 
@@ -1173,7 +1176,7 @@ export async function updateTemplate(req, res) {
     if (custom_sections    !== undefined) { fields.push('custom_sections = ?');    values.push(custom_sections ? JSON.stringify(custom_sections) : null) }
     if (fields.length === 0) return res.status(400).json({ error: 'Nenhum campo para atualizar' })
 
-    await pool.query(`UPDATE lesson_plan_templates SET ${fields.join(', ')} WHERE id = ?`, [...values, templateId])
+    await pool.query(`UPDATE lesson_plan_templates SET ${fields.join(', ')} WHERE id = ? AND school_id = ?`, [...values, templateId, sid])
     const [rows] = await pool.query('SELECT * FROM lesson_plan_templates WHERE id = ?', [templateId])
     res.json(rows[0])
   } catch (err) {

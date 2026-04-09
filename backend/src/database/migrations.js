@@ -270,6 +270,7 @@ async function ensureSaasOwnerRole() {
 // ─── EXPORT PRINCIPAL ─────────────────────────────────────────────────────────
 export async function ensureContactColumns() {
   await ensureSchoolsTable()
+  await addColumnIfMissing('schools', 'monthly_fee DECIMAL(8,2) NOT NULL DEFAULT 0.00')
   await addPhoneColumnIfMissing('users')
   await addPhoneColumnIfMissing('students')
   await addPhoneColumnIfMissing('responsibles')

@@ -372,6 +372,9 @@ function LeadModal({ lead, onClose, onDelete, onRefresh, authFetch, apiBase }: {
     setEditing(false)
     setEditError(null)
     setSavedNotes({})
+    setEditingNoteId(null)
+    setNoteDraft('')
+    setNoteError(null)
   }, [lead])
 
   const saveEdit = async () => {
@@ -1246,15 +1249,12 @@ export default function SecretaryCRM({ apiBase = '/secretary' }: { apiBase?: str
     if (res.ok) { setLeads(ls => ls.filter(l => l.id !== id)); if (openLead?.id === id) setOpenLead(null) }
   }
   const handleRefreshLead = async (id: number) => {
-    const res = await authFetch(`${apiBase}/crm/leads`)
+    const res = await authFetch(`${apiBase}/crm/leads/${id}`)
     if (res.ok) {
-      const json = await res.json()
-      const data: Lead[] = Array.isArray(json) ? json : (json.data ?? [])
-      const fresh = data.find(l => l.id === id)
-      if (fresh) {
-        const n = normalizeLead(fresh)
-        setLeads(ls => ls.map(l => l.id === id ? n : l)); setOpenLead(n)
-      }
+      const fresh = await res.json()
+      const n = normalizeLead(fresh as Lead)
+      setLeads(ls => ls.map(l => l.id === id ? n : l))
+      setOpenLead(n)
     }
   }
   const handleDelete = async (id: number) => {
@@ -1292,6 +1292,7 @@ export default function SecretaryCRM({ apiBase = '/secretary' }: { apiBase?: str
   const experimental = leads.filter(l => l.stage === 'EXPERIMENTAL').length
   const lost         = leads.filter(l => l.stage === 'PERDIDO').length
   const overdueToday = leads.filter(l => {
+    if (['MATRICULADO', 'PERDIDO'].includes(l.stage)) return false
     const dates = [l.follow_up_at, l.next_followup].filter(Boolean) as string[]
     return dates.some(d => new Date(d) <= now)
   }).length

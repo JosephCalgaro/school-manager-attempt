@@ -388,8 +388,10 @@ export async function reactivateLead(req, res) {
       [id, sid, prevStage, req.userId, reactivateNote]
     )
     await recalcScore(id)
-    const [[updated]] = await pool.query('SELECT * FROM crm_leads WHERE id=?', [id])
-    res.json(updated)
+    const [rows] = await pool.query(
+      `${LEAD_AGG_SQL} WHERE l.id = ?`, [id]
+    )
+    res.json(rows[0])
   } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao reativar lead' }) }
 }
 
@@ -421,10 +423,7 @@ export async function createLead(req, res) {
     )
     await recalcScore(r.insertId)
     const [rows] = await pool.query(
-      `SELECT l.*, u.full_name AS assigned_name, 0 AS total_activities,
-       0 AS pending_followups, NULL AS next_followup, NULL AS next_exp_class, 0 AS pending_exp_classes
-       FROM crm_leads l LEFT JOIN users u ON u.id = l.assigned_to WHERE l.id = ?`,
-      [r.insertId]
+      `${LEAD_AGG_SQL} WHERE l.id = ?`, [r.insertId]
     )
     res.status(201).json(rows[0])
   } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao criar lead' }) }
@@ -478,7 +477,9 @@ export async function updateLead(req, res) {
       )
     }
     await recalcScore(id)
-    const [rows] = await pool.query('SELECT * FROM crm_leads WHERE id = ?', [id])
+    const [rows] = await pool.query(
+      `${LEAD_AGG_SQL} WHERE l.id = ?`, [id]
+    )
     res.json(rows[0])
   } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao atualizar lead' }) }
 }
@@ -488,14 +489,20 @@ export async function updateLead(req, res) {
 export async function deleteLead(req, res) {
   const id = Number(req.params.id); const sid = req.schoolId
   if (!Number.isInteger(id)) return res.status(400).json({ error: 'ID inválido' })
+  const conn = await pool.getConnection()
   try {
-    await pool.query('DELETE FROM crm_lead_field_values WHERE lead_id = ?', [id])
-    await pool.query('DELETE FROM crm_activities WHERE lead_id = ?', [id])
-    await pool.query('DELETE FROM crm_stage_logs WHERE lead_id = ?', [id])
-    const [r] = await pool.query('DELETE FROM crm_leads WHERE id=? AND school_id=?', [id, sid])
-    if (r.affectedRows === 0) return res.status(404).json({ error: 'Lead não encontrado' })
+    await conn.beginTransaction()
+    await conn.query('DELETE FROM crm_lead_field_values WHERE lead_id = ?', [id])
+    await conn.query('DELETE FROM crm_activities WHERE lead_id = ?', [id])
+    await conn.query('DELETE FROM crm_stage_logs WHERE lead_id = ?', [id])
+    const [r] = await conn.query('DELETE FROM crm_leads WHERE id=? AND school_id=?', [id, sid])
+    if (r.affectedRows === 0) { await conn.rollback(); return res.status(404).json({ error: 'Lead não encontrado' }) }
+    await conn.commit()
     res.json({ message: 'Lead removido' })
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao remover lead' }) }
+  } catch (err) {
+    await conn.rollback()
+    console.error(err); res.status(500).json({ error: 'Erro ao remover lead' })
+  } finally { conn.release() }
 }
 
 // ─── Custom Fields ────────────────────────────────────────────────────────────
@@ -708,9 +715,11 @@ export async function toggleActivity(req, res) {
     } else {
       await pool.query('UPDATE crm_activities SET done=0, done_note=NULL WHERE id=?', [actId])
     }
-    const [rows] = await pool.query('SELECT * FROM crm_activities WHERE id = ?', [actId])
-    await recalcScore(rows[0].lead_id)
-    res.json(rows[0])
+    const [[updated]] = await pool.query(
+      `SELECT a.*, u.full_name AS created_by_name FROM crm_activities a LEFT JOIN users u ON u.id = a.created_by WHERE a.id = ?`, [actId]
+    )
+    await recalcScore(updated.lead_id)
+    res.json(updated)
   } catch (err) { res.status(500).json({ error: 'Erro' }) }
 }
 // ─── getFunnelMetrics ─────────────────────────────────────────────────────────

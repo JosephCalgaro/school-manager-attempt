@@ -21,6 +21,9 @@ export const getAllStudents = async (req, res) => {
   const sid = req.schoolId
   try {
     const { search, status, limit = 10, offset = 0 } = req.query
+    const maxLimit = 500
+    const safeLimit = Math.min(maxLimit, Math.max(1, parseInt(limit)))
+    const safeOffset = Math.max(0, parseInt(offset))
     const conditions = ['school_id = ?']
     const params     = [sid]
 
@@ -34,9 +37,9 @@ export const getAllStudents = async (req, res) => {
     const where    = ' WHERE ' + conditions.join(' AND ')
     const query    = `SELECT id, full_name, cpf, email, phone, birth_date, is_active, city, deactivation_reason, created_at FROM students${where} ORDER BY is_active DESC, full_name LIMIT ? OFFSET ?`
     const countQ   = `SELECT COUNT(*) as total FROM students${where}`
-    const [students]    = await pool.query(query,  [...params, parseInt(limit), parseInt(offset)])
+    const [students]    = await pool.query(query,  [...params, safeLimit, safeOffset])
     const [countResult] = await pool.query(countQ, params)
-    res.json({ data: students, total: countResult[0].total, limit: parseInt(limit), offset: parseInt(offset) })
+    res.json({ data: students, total: countResult[0].total, limit: safeLimit, offset: safeOffset })
   } catch (error) {
     console.error('Erro ao listar alunos:', error)
     res.status(500).json({ message: 'Erro ao listar alunos' })
@@ -78,6 +81,7 @@ export const getStudentDetails = async (req, res) => {
     }
     res.json({ ...student, responsible })
   } catch (error) {
+    console.error('Erro ao buscar detalhes do aluno:', error)
     res.status(500).json({ message: 'Erro ao buscar detalhes do aluno' })
   }
 }
@@ -128,7 +132,7 @@ export const updateStudentDetails = async (req, res) => {
     if (error?.code === 'ER_DUP_ENTRY') return res.status(409).json({ message: 'CPF ou email já cadastrado' })
     console.error('Erro ao atualizar aluno:', error)
     res.status(500).json({ message: 'Erro ao atualizar aluno' })
-  } finally { conn.release() }
+  } finally { if (conn) conn.release() }
 }
 
 export const getStudentClasses = async (req, res) => {
@@ -228,6 +232,9 @@ export const getAllUsers = async (req, res) => {
   const sid = req.schoolId
   try {
     const { search, role, status, limit = 10, offset = 0 } = req.query
+    const maxLimit = 500
+    const safeLimit = Math.min(maxLimit, Math.max(1, parseInt(limit)))
+    const safeOffset = Math.max(0, parseInt(offset))
     // SAAS_OWNER nunca aparece na listagem de usuários da escola
     const conditions = ['school_id = ?', "role != 'SAAS_OWNER'", 'is_temp = 0']
     const params = [sid]
@@ -237,10 +244,13 @@ export const getAllUsers = async (req, res) => {
     if (status === 'inactive') conditions.push('is_active = 0')
     const where = ' WHERE ' + conditions.join(' AND ')
     const query = `SELECT id, full_name, email, phone, role, is_active, created_at FROM users${where} ORDER BY is_active DESC, full_name LIMIT ? OFFSET ?`
-    const [users]        = await pool.query(query, [...params, parseInt(limit), parseInt(offset)])
+    const [users]        = await pool.query(query, [...params, safeLimit, safeOffset])
     const [countResult]  = await pool.query(`SELECT COUNT(*) as total FROM users${where}`, params)
-    res.json({ data: users, total: countResult[0].total, limit: parseInt(limit), offset: parseInt(offset) })
-  } catch (error) { res.status(500).json({ message: 'Erro ao listar usuários' }) }
+    res.json({ data: users, total: countResult[0].total, limit: safeLimit, offset: safeOffset })
+  } catch (error) {
+    console.error('Erro ao listar usuários:', error)
+    res.status(500).json({ message: 'Erro ao listar usuários' })
+  }
 }
 
 export const toggleUserActive = async (req, res) => {
@@ -265,7 +275,10 @@ export const toggleUserActive = async (req, res) => {
     const newStatus = u.is_active ? 0 : 1
     await pool.query('UPDATE users SET is_active = ? WHERE id = ? AND school_id = ?', [newStatus, req.params.id, sid])
     res.json({ is_active: newStatus, message: newStatus ? 'Usuário reativado' : 'Usuário desativado' })
-  } catch (error) { res.status(500).json({ message: 'Erro ao alterar status do usuário' }) }
+  } catch (error) {
+    console.error('Erro ao alterar status do usuário:', error)
+    res.status(500).json({ message: 'Erro ao alterar status do usuário' })
+  }
 }
 
 export const getUserDetails = async (req, res) => {
@@ -284,7 +297,10 @@ export const getUserDetails = async (req, res) => {
       classes = tc
     }
     res.json({ ...user, classes })
-  } catch (error) { res.status(500).json({ message: 'Erro ao buscar detalhes do usuário' }) }
+  } catch (error) {
+    console.error('Erro ao buscar detalhes do usuário:', error)
+    res.status(500).json({ message: 'Erro ao buscar detalhes do usuário' })
+  }
 }
 
 export const createUser = async (req, res) => {
@@ -357,7 +373,10 @@ export const getSecretaryStats = async (req, res) => {
     )
     const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
     res.json({ totalStudents, newThisMonth, currentMonth: months[new Date().getMonth()] })
-  } catch (error) { res.status(500).json({ message: 'Erro ao buscar estatísticas' }) }
+  } catch (error) {
+    console.error('Erro ao buscar estatísticas:', error)
+    res.status(500).json({ message: 'Erro ao buscar estatísticas' })
+  }
 }
 
 export const getAllClasses = async (req, res) => {
@@ -377,7 +396,10 @@ export const getAllClasses = async (req, res) => {
                    ${where} GROUP BY c.id ORDER BY c.is_active DESC, c.name`
     const [classes] = await pool.query(query, params)
     res.json(classes)
-  } catch (error) { res.status(500).json({ message: 'Erro ao listar turmas' }) }
+  } catch (error) {
+    console.error('Erro ao listar turmas:', error)
+    res.status(500).json({ message: 'Erro ao listar turmas' })
+  }
 }
 
 export const createClass = async (req, res) => {
@@ -400,6 +422,7 @@ export const createClass = async (req, res) => {
     res.status(201).json({ id: classId, message: 'Turma criada com sucesso' })
   } catch (error) {
     await conn.rollback()
+    console.error('Erro ao criar turma:', error)
     res.status(500).json({ message: 'Erro ao criar turma' })
   } finally { conn.release() }
 }
@@ -418,6 +441,9 @@ export const updateClass = async (req, res) => {
     if (is_active  !== undefined) { fields.push('is_active = ?');  values.push(is_active ? 1 : 0) }
     if (fields.length > 0) await conn.query(`UPDATE classes SET ${fields.join(', ')} WHERE id = ? AND school_id = ?`, [...values, id, sid])
     if (Array.isArray(students)) {
+      // Verifica que a turma pertence à escola antes de manipular alunos
+      const [[cls]] = await conn.query('SELECT id FROM classes WHERE id = ? AND school_id = ?', [id, sid])
+      if (!cls) { await conn.rollback(); return res.status(404).json({ message: 'Turma não encontrada' }) }
       await conn.query('DELETE FROM class_students WHERE class_id = ?', [id])
       if (students.length > 0) {
         const rows = students.map(sId => [id, sId])
@@ -428,6 +454,7 @@ export const updateClass = async (req, res) => {
     res.json({ message: 'Turma atualizada com sucesso' })
   } catch (error) {
     await conn.rollback()
+    console.error('Erro ao atualizar turma:', error)
     res.status(500).json({ message: 'Erro ao atualizar turma' })
   } finally { conn.release() }
 }
@@ -440,16 +467,23 @@ export const toggleClassActive = async (req, res) => {
     const newStatus = cls.is_active ? 0 : 1
     await pool.query('UPDATE classes SET is_active = ? WHERE id = ? AND school_id = ?', [newStatus, req.params.id, sid])
     res.json({ is_active: newStatus, message: newStatus ? 'Turma reativada' : 'Turma desativada' })
-  } catch (error) { res.status(500).json({ message: 'Erro ao alterar status da turma' }) }
+  } catch (error) {
+    console.error('Erro ao alterar status da turma:', error)
+    res.status(500).json({ message: 'Erro ao alterar status da turma' })
+  }
 }
 
 export const getClassStudentsList = async (req, res) => {
+  const sid = req.schoolId
   try {
+    // Garante que a turma pertence à escola antes de listar os alunos
+    const [[cls]] = await pool.query('SELECT id FROM classes WHERE id = ? AND school_id = ?', [req.params.id, sid])
+    if (!cls) return res.status(404).json({ message: 'Turma não encontrada' })
     const [students] = await pool.query(
       `SELECT s.id, s.full_name, s.email, s.cpf FROM students s
        JOIN class_students cs ON cs.student_id = s.id
-       WHERE cs.class_id = ? ORDER BY s.full_name`,
-      [req.params.id]
+       WHERE cs.class_id = ? AND s.school_id = ? ORDER BY s.full_name`,
+      [req.params.id, sid]
     )
     res.json(students)
   } catch (error) { res.status(500).json({ message: 'Erro ao listar alunos da turma' }) }
@@ -457,15 +491,25 @@ export const getClassStudentsList = async (req, res) => {
 
 export const addStudentToClass = async (req, res) => {
   const { student_id } = req.body || {}
+  const sid = req.schoolId
   if (!student_id) return res.status(400).json({ message: 'student_id é obrigatório' })
   try {
+    // Verifica que a turma e o aluno pertencem à mesma escola
+    const [[cls]] = await pool.query('SELECT id FROM classes WHERE id = ? AND school_id = ?', [req.params.id, sid])
+    if (!cls) return res.status(404).json({ message: 'Turma não encontrada' })
+    const [[stu]] = await pool.query('SELECT id FROM students WHERE id = ? AND school_id = ?', [student_id, sid])
+    if (!stu) return res.status(404).json({ message: 'Aluno não encontrado' })
     await pool.query('INSERT IGNORE INTO class_students (class_id, student_id) VALUES (?, ?)', [req.params.id, student_id])
     res.json({ message: 'Aluno adicionado à turma' })
   } catch (error) { res.status(500).json({ message: 'Erro ao adicionar aluno' }) }
 }
 
 export const removeStudentFromClass = async (req, res) => {
+  const sid = req.schoolId
   try {
+    // Garante que a turma pertence à escola antes de remover
+    const [[cls]] = await pool.query('SELECT id FROM classes WHERE id = ? AND school_id = ?', [req.params.id, sid])
+    if (!cls) return res.status(404).json({ message: 'Turma não encontrada' })
     await pool.query('DELETE FROM class_students WHERE class_id = ? AND student_id = ?', [req.params.id, req.params.studentId])
     res.json({ message: 'Aluno removido da turma' })
   } catch (error) { res.status(500).json({ message: 'Erro ao remover aluno' }) }

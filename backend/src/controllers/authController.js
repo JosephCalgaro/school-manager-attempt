@@ -68,12 +68,16 @@ export async function login(req, res) {
 
     // 2. Tenta aluno
     const [studentRows] = await pool.query(
-      'SELECT id, full_name, email, password_hash, school_id FROM students WHERE email = ?',
+      'SELECT id, full_name, email, password_hash, is_active, school_id FROM students WHERE email = ?',
       [email]
     )
 
     if (studentRows.length > 0) {
       const student = studentRows[0]
+      if (!student.is_active) {
+        recordFailedLogin(getIp(req))
+        return res.status(403).json({ error: 'Aluno inativo' })
+      }
       if (!student.password_hash) {
         recordFailedLogin(getIp(req))
         return res.status(403).json({ error: 'Acesso não configurado. Contate a secretaria.' })
@@ -84,19 +88,23 @@ export async function login(req, res) {
         return res.status(401).json({ error: 'Credenciais inválidas' })
       }
       clearLoginAttempts(getIp(req))
-      const token = signToken({ id: student.id, role: 'STUDENT' })
+      const token = signToken({ id: student.id, role: 'STUDENT', school_id: student.school_id })
       delete student.password_hash
       return res.json({ user: { ...student, role: 'STUDENT' }, token })
     }
 
     // 3. Tenta responsável
     const [respRows] = await pool.query(
-      'SELECT id, full_name, email, password_hash, school_id FROM responsibles WHERE email = ?',
+      'SELECT id, full_name, email, password_hash, is_active, school_id FROM responsibles WHERE email = ?',
       [email]
     )
 
     if (respRows.length > 0) {
       const resp = respRows[0]
+      if (!resp.is_active) {
+        recordFailedLogin(getIp(req))
+        return res.status(403).json({ error: 'Responsável inativo' })
+      }
       if (!resp.password_hash) {
         recordFailedLogin(getIp(req))
         return res.status(403).json({ error: 'Senha não configurada. Contate a secretaria para definir sua senha.' })
@@ -107,7 +115,7 @@ export async function login(req, res) {
         return res.status(401).json({ error: 'Credenciais inválidas' })
       }
       clearLoginAttempts(getIp(req))
-      const token = signToken({ id: resp.id, role: 'RESPONSIBLE' })
+      const token = signToken({ id: resp.id, role: 'RESPONSIBLE', school_id: resp.school_id })
       delete resp.password_hash
       return res.json({ user: { ...resp, role: 'RESPONSIBLE' }, token })
     }

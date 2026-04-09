@@ -105,11 +105,12 @@ export async function getMovements(req, res) {
     const [rows] = await pool.query(`
       SELECT m.*, u.full_name AS created_by_name
       FROM inventory_movements m
+      JOIN inventory_items i ON i.id = m.item_id
       LEFT JOIN users u ON u.id = m.created_by
-      WHERE m.item_id = ?
+      WHERE m.item_id = ? AND i.school_id = ?
       ORDER BY m.created_at DESC
       LIMIT 100
-    `, [itemId])
+    `, [itemId, req.schoolId])
     res.json(rows)
   } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao buscar movimentações' }) }
 }
@@ -117,6 +118,7 @@ export async function getMovements(req, res) {
 export async function registerMovement(req, res) {
   const itemId = Number(req.params.id)
   if (!Number.isInteger(itemId)) return res.status(400).json({ error: 'ID inválido' })
+  const sid = req.schoolId
   try {
     const { type, quantity, notes } = req.body || {}
     if (!type || !['ENTRADA', 'SAIDA'].includes(type))
@@ -124,24 +126,44 @@ export async function registerMovement(req, res) {
     const qty = Number(quantity)
     if (!qty || qty <= 0) return res.status(400).json({ error: 'Quantidade deve ser maior que zero' })
 
-    // Check stock for SAIDA
-    if (type === 'SAIDA') {
-      const [[item]] = await pool.query('SELECT quantity FROM inventory_items WHERE id = ?', [itemId])
-      if (!item) return res.status(404).json({ error: 'Item não encontrado' })
-      if (item.quantity < qty) return res.status(400).json({ error: `Estoque insuficiente (disponível: ${item.quantity})` })
-    }
+    const conn = await pool.getConnection()
+    try {
+      await conn.beginTransaction()
 
-    const delta = type === 'ENTRADA' ? qty : -qty
-    await pool.query('UPDATE inventory_items SET quantity = quantity + ? WHERE id = ?', [delta, itemId])
-    const [r] = await pool.query(
-      `INSERT INTO inventory_movements (item_id, type, quantity, notes, created_by) VALUES (?, ?, ?, ?, ?)`,
-      [itemId, type, qty, notes || null, req.userId]
-    )
-    const [[mov]] = await pool.query(
-      `SELECT m.*, u.full_name AS created_by_name FROM inventory_movements m
-       LEFT JOIN users u ON u.id = m.created_by WHERE m.id = ?`, [r.insertId]
-    )
-    const [[updatedItem]] = await pool.query('SELECT * FROM inventory_items WHERE id = ?', [itemId])
-    res.status(201).json({ movement: mov, item: updatedItem })
+      // FOR UPDATE garante exclusão mútua — elimina race condition
+      const [[item]] = await conn.query(
+        'SELECT quantity FROM inventory_items WHERE id = ? AND school_id = ? FOR UPDATE',
+        [itemId, sid]
+      )
+      if (!item) { await conn.rollback(); return res.status(404).json({ error: 'Item não encontrado' }) }
+
+      if (type === 'SAIDA') {
+        if (item.quantity < qty) {
+          await conn.rollback()
+          return res.status(400).json({ error: `Estoque insuficiente (disponível: ${item.quantity})` })
+        }
+      }
+
+      const delta = type === 'ENTRADA' ? qty : -qty
+      await conn.query('UPDATE inventory_items SET quantity = quantity + ? WHERE id = ? AND school_id = ?', [delta, itemId, sid])
+      const [r] = await conn.query(
+        `INSERT INTO inventory_movements (item_id, type, quantity, notes, created_by) VALUES (?, ?, ?, ?, ?)`,
+        [itemId, type, qty, notes || null, req.userId]
+      )
+
+      await conn.commit()
+
+      const [[mov]] = await pool.query(
+        `SELECT m.*, u.full_name AS created_by_name FROM inventory_movements m
+         LEFT JOIN users u ON u.id = m.created_by WHERE m.id = ?`, [r.insertId]
+      )
+      const [[updatedItem]] = await pool.query('SELECT * FROM inventory_items WHERE id = ?', [itemId])
+      res.status(201).json({ movement: mov, item: updatedItem })
+    } catch (err) {
+      await conn.rollback()
+      throw err
+    } finally {
+      conn.release()
+    }
   } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao registrar movimentação' }) }
 }

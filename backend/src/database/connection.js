@@ -26,6 +26,8 @@ const pool = mysql.createPool({
     queueLimit: 0,
     // Retorna DATE/DATETIME como strings (evita conversão para Date JS + timezone bugs)
     dateStrings: true,
+    // Charset UTF-8 para evitar acentos corrompidos (ç, ã, é, etc.)
+    charset: 'utf8mb4',
 })
 
 // exporta pool para ser usado em qualquer parte do projeto
