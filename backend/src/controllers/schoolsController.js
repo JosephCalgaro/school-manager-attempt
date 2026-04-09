@@ -1,8 +1,24 @@
 import pool   from '../database/connection.js'
+/**
+ * Common locals used across controllers:
+ * - sid: school id for the current request (from `req.schoolId`)
+ * - req.userId: id of the authenticated user
+ * - req.userRole / req.isTemp: auth metadata
+ * - t: short name for wildcard search values (`%term%`) when used
+ * - countQ / query: SQL query strings (countQ typically holds COUNT(*) SQL)
+ * - params: array of SQL parameter values
+ * - conn: DB connection from `pool.getConnection()` when using transactions
+ */
 import bcrypt from 'bcryptjs'
 import { logEvent } from '../middlewares/logger.js'
 
 // ─── Listar escola própria (admin da escola) ──────────────────────────────────
+/**
+ * getMySchool - retorna dados da escola do admin autenticado
+ *
+ * Locals:
+ * - rows: query result rows
+ */
 export async function getMySchool(req, res) {
   try {
     const [rows] = await pool.query(
@@ -16,6 +32,12 @@ export async function getMySchool(req, res) {
 }
 
 // ─── Atualizar escola própria ─────────────────────────────────────────────────
+/**
+ * updateMySchool - atualiza os campos da escola do admin autenticado
+ *
+ * Locals:
+ * - fields, values: arrays usadas para montar a query de update
+ */
 export async function updateMySchool(req, res) {
   const { name, cnpj, email, phone, address } = req.body || {}
   try {
@@ -32,6 +54,12 @@ export async function updateMySchool(req, res) {
 }
 
 // ─── SAAS OWNER: listar todas as escolas ─────────────────────────────────────
+/**
+ * listAllSchools - lista todas as escolas (SaaS owner)
+ *
+ * Locals:
+ * - rows: query result rows
+ */
 export async function listAllSchools(req, res) {
   try {
     const [rows] = await pool.query(`
@@ -48,6 +76,12 @@ export async function listAllSchools(req, res) {
 }
 
 // ─── SAAS OWNER: criar escola + admin (onboarding completo) ──────────────────
+/**
+ * createSchoolWithAdmin - cria escola + usuário admin (onboarding)
+ *
+ * Locals:
+ * - schoolResult, schoolId, password_hash, userResult: intermediate results
+ */
 export async function createSchoolWithAdmin(req, res) {
   const {
     school_name, school_cnpj, school_email, school_phone, school_address, plan,
@@ -99,6 +133,14 @@ export async function createSchoolWithAdmin(req, res) {
 }
 
 // ─── SAAS OWNER: atualizar escola ─────────────────────────────────────────────
+/**
+ * updateSchool - atualiza dados de uma escola (SaaS owner)
+ *
+ * Locals:
+ * - id: escola id (from params)
+ * - fields, values: arrays usadas para montar update
+ * - result: query result
+ */
 export async function updateSchool(req, res) {
   const id = Number(req.params.id)
   if (!Number.isInteger(id)) return res.status(400).json({ error: 'ID inválido' })
@@ -121,6 +163,14 @@ export async function updateSchool(req, res) {
 }
 
 // ─── SAAS OWNER: ativar/desativar escola ──────────────────────────────────────
+/**
+ * toggleSchool - ativa/desativa uma escola
+ *
+ * Locals:
+ * - id: escola id (from params)
+ * - s: current status row
+ * - newStatus: novo status calculado
+ */
 export async function toggleSchool(req, res) {
   const id = Number(req.params.id)
   if (!Number.isInteger(id)) return res.status(400).json({ error: 'ID inválido' })
@@ -135,6 +185,13 @@ export async function toggleSchool(req, res) {
 }
 
 // ─── SAAS OWNER: deletar escola ───────────────────────────────────────────────
+/**
+ * deleteSchool - deleta uma escola (com proteção para id=1)
+ *
+ * Locals:
+ * - id: escola id (from params)
+ * - result: delete query result
+ */
 export async function deleteSchool(req, res) {
   const id = Number(req.params.id)
   if (!Number.isInteger(id)) return res.status(400).json({ error: 'ID inválido' })

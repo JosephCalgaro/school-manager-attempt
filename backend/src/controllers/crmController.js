@@ -1,4 +1,14 @@
 import pool from '../database/connection.js'
+/**
+ * Common locals used across controllers:
+ * - sid: school id for the current request (from `req.schoolId`)
+ * - req.userId: id of the authenticated user
+ * - req.userRole / req.isTemp: auth metadata
+ * - t: short name for wildcard search values (`%term%`) when used
+ * - countQ / query: SQL query strings (countQ typically holds COUNT(*) SQL)
+ * - params: array of SQL parameter values
+ * - conn: DB connection from `pool.getConnection()` when using transactions
+ */
 
 // ─── Tabelas e migrações ──────────────────────────────────────────────────────
 
@@ -6,6 +16,12 @@ import pool from '../database/connection.js'
 // Não deve ser chamada em cada request. Ver app.js: initCrmTables()
 let _crmTablesReady = false
 
+/**
+ * initCrmTables - inicializa tabelas CRM na startup (idempotente)
+ *
+ * Locals:
+ * - _crmTablesReady: flag de inicialização
+ */
 export async function initCrmTables() {
   if (_crmTablesReady) return
   await ensureCrmTables()
@@ -13,6 +29,13 @@ export async function initCrmTables() {
   console.log('[CRM] Tabelas inicializadas com sucesso')
 }
 
+/**
+ * ensureCrmTables - cria/migra tabelas CRM quando necessário
+ *
+ * Locals:
+ * - activityCols, newCols, enumCols, newIndexes: arrays de migração
+ * - r: result sets from information_schema checks
+ */
 async function ensureCrmTables() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS crm_leads (
@@ -175,6 +198,14 @@ async function ensureCrmTables() {
 
 // ─── Score ────────────────────────────────────────────────────────────────────
 
+/**
+ * calcScore - calcula score de um lead a partir de sinais e contagens
+ *
+ * Locals:
+ * - s: score acumulado
+ * - stageBonus: mapeamento de bônus por estágio
+ * - actCount, doneFollowUps, doneExpClasses: contadores passados
+ */
 function calcScore(lead, actCount = 0, doneFollowUps = 0, doneExpClasses = 0) {
   let s = 0
   if (lead.phone)        s += 10
@@ -191,6 +222,12 @@ function calcScore(lead, actCount = 0, doneFollowUps = 0, doneExpClasses = 0) {
   return Math.min(s, 100)
 }
 
+/**
+ * calcTemperature - classifica temperatura com base em score e última atividade
+ *
+ * Locals:
+ * - days: dias desde a última atividade (ou 999 se indefinido)
+ */
 function calcTemperature(score, lastActivityAt) {
   const days = lastActivityAt
     ? Math.floor((Date.now() - new Date(lastActivityAt).getTime()) / 86400000) : 999
@@ -199,6 +236,13 @@ function calcTemperature(score, lastActivityAt) {
   return 'FRIO'
 }
 
+/**
+ * recalcScore - recalcula score e temperatura de um lead e atualiza DB
+ *
+ * Locals:
+ * - lead, agg: rows selected from DB
+ * - score, temperature: calculados via helpers
+ */
 async function recalcScore(leadId) {
   const [[lead]] = await pool.query('SELECT * FROM crm_leads WHERE id = ?', [leadId])
   if (!lead) return
@@ -250,6 +294,17 @@ const LEAD_AGG_SQL = `
 // ─── checkDuplicate ───────────────────────────────────────────────────────────
 // Verifica duplicidade por CPF, RG ou telefone antes de criar/atualizar
 
+/**
+ * checkDuplicate - verifica duplicidade de lead por CPF/RG/telefone
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * Locals:
+ * - sid: school id
+ * - cpf, rg, phone, exclude_id: query params
+ * - cpfClean, rgClean, phoneClean: normalized values
+ * - conditions, params, sql, allParams
+ */
 export async function checkDuplicate(req, res) {
   const sid = req.schoolId
   const { cpf, rg, phone, exclude_id } = req.query
@@ -286,6 +341,13 @@ export async function checkDuplicate(req, res) {
 
 // ─── getLeadById ──────────────────────────────────────────────────────────────
 
+/**
+ * getLeadById - retorna um lead com agregados por id
+ *
+ * Locals:
+ * - id: id do lead (Number(req.params.id))
+ * - sid: school id
+ */
 export async function getLeadById(req, res) {
   const id = Number(req.params.id); const sid = req.schoolId
   if (!Number.isInteger(id)) return res.status(400).json({ error: 'ID inválido' })
@@ -301,6 +363,14 @@ export async function getLeadById(req, res) {
 
 // ─── getLeads ─────────────────────────────────────────────────────────────────
 
+/**
+ * getLeads - lista leads com filtros, paginação e agregados
+ *
+ * Locals:
+ * - sid, assigned_to, source, temperature, search, page, limit
+ * - pageNum, pageSize, offset
+ * - where, params, total, rows
+ */
 export async function getLeads(req, res) {
   const sid = req.schoolId
   try {
@@ -346,6 +416,12 @@ export async function getLeads(req, res) {
 
 // ─── getArchivedLeads ─────────────────────────────────────────────────────────
 
+/**
+ * getArchivedLeads - retorna leads arquivados com filtros
+ *
+ * Locals:
+ * - sid, type, search, where, params, rows
+ */
 export async function getArchivedLeads(req, res) {
   const sid = req.schoolId
   const { type = 'all', search } = req.query // type: all | enrolled | lost
@@ -368,6 +444,12 @@ export async function getArchivedLeads(req, res) {
 
 // ─── reactivateLead ───────────────────────────────────────────────────────────
 
+/**
+ * reactivateLead - reativa um lead arquivado/perdido e recalcula score
+ *
+ * Locals:
+ * - id, sid, lead, prev, reactivateNote
+ */
 export async function reactivateLead(req, res) {
   const id = Number(req.params.id); const sid = req.schoolId
   if (!Number.isInteger(id)) return res.status(400).json({ error: 'ID inválido' })
@@ -395,6 +477,13 @@ export async function reactivateLead(req, res) {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao reativar lead' }) }
 }
 
+/**
+ * createLead - cria um lead CRM e cria log inicial
+ *
+ * Locals:
+ * - sid, name, phone, email, cpf, rg, student_name, age_range, source, notes
+ * - cpfNorm, phoneNorm, r, rows
+ */
 export async function createLead(req, res) {
   const sid = req.schoolId
   try {
@@ -431,6 +520,12 @@ export async function createLead(req, res) {
 
 // ─── updateLead ───────────────────────────────────────────────────────────────
 
+/**
+ * updateLead - atualiza campos de um lead, sincroniza colunas normalizadas
+ *
+ * Locals:
+ * - id, sid, existing, prev, allowed, fields, values, changed, changedFields
+ */
 export async function updateLead(req, res) {
   const id = Number(req.params.id); const sid = req.schoolId
   if (!Number.isInteger(id)) return res.status(400).json({ error: 'ID inválido' })
@@ -486,6 +581,12 @@ export async function updateLead(req, res) {
 
 // ─── deleteLead ───────────────────────────────────────────────────────────────
 
+/**
+ * deleteLead - remove lead e dados relacionados em transação
+ *
+ * Locals:
+ * - id, sid, conn, r
+ */
 export async function deleteLead(req, res) {
   const id = Number(req.params.id); const sid = req.schoolId
   if (!Number.isInteger(id)) return res.status(400).json({ error: 'ID inválido' })
@@ -507,6 +608,12 @@ export async function deleteLead(req, res) {
 
 // ─── Custom Fields ────────────────────────────────────────────────────────────
 
+/**
+ * getCustomFields - lista campos personalizados da escola
+ *
+ * Locals:
+ * - sid, rows
+ */
 export async function getCustomFields(req, res) {
   const sid = req.schoolId
   try {
@@ -518,6 +625,12 @@ export async function getCustomFields(req, res) {
   } catch (err) { res.status(500).json({ error: 'Erro ao buscar campos' }) }
 }
 
+/**
+ * createCustomField - cria um campo personalizado e retorna o registro
+ *
+ * Locals:
+ * - sid, name, field_type, options, required, pos, r, field
+ */
 export async function createCustomField(req, res) {
   const sid = req.schoolId
   const { name, field_type = 'TEXT', options, required = 0 } = req.body || {}
@@ -540,6 +653,12 @@ export async function createCustomField(req, res) {
   }
 }
 
+/**
+ * updateCustomField - atualiza um campo personalizado
+ *
+ * Locals:
+ * - id, sid, name, field_type, options, required, position, fields, values
+ */
 export async function updateCustomField(req, res) {
   const id = Number(req.params.fieldId); const sid = req.schoolId
   if (!Number.isInteger(id)) return res.status(400).json({ error: 'ID inválido' })
@@ -561,6 +680,12 @@ export async function updateCustomField(req, res) {
   } catch (err) { res.status(500).json({ error: 'Erro ao atualizar campo' }) }
 }
 
+/**
+ * deleteCustomField - remove campo personalizado e seus valores
+ *
+ * Locals:
+ * - id, sid
+ */
 export async function deleteCustomField(req, res) {
   const id = Number(req.params.fieldId); const sid = req.schoolId
   if (!Number.isInteger(id)) return res.status(400).json({ error: 'ID inválido' })
@@ -571,6 +696,12 @@ export async function deleteCustomField(req, res) {
   } catch (err) { res.status(500).json({ error: 'Erro ao remover campo' }) }
 }
 
+/**
+ * getLeadFieldValues - obtém valores de campos personalizados de um lead
+ *
+ * Locals:
+ * - leadId, rows
+ */
 export async function getLeadFieldValues(req, res) {
   const leadId = Number(req.params.id)
   if (!Number.isInteger(leadId)) return res.status(400).json({ error: 'ID inválido' })
@@ -585,6 +716,12 @@ export async function getLeadFieldValues(req, res) {
   } catch (err) { res.status(500).json({ error: 'Erro ao buscar valores' }) }
 }
 
+/**
+ * upsertLeadFieldValues - insere ou atualiza valores de campos personalizados em batch
+ *
+ * Locals:
+ * - leadId, sid, values, validValues, fieldIds, existingMap, changedFields
+ */
 export async function upsertLeadFieldValues(req, res) {
   const leadId = Number(req.params.id); const sid = req.schoolId
   if (!Number.isInteger(leadId)) return res.status(400).json({ error: 'ID inválido' })
@@ -647,6 +784,12 @@ export async function upsertLeadFieldValues(req, res) {
 
 // ─── getActivities ────────────────────────────────────────────────────────────
 
+/**
+ * getActivities - retorna atividades e logs de um lead
+ *
+ * Locals:
+ * - leadId, acts, logs
+ */
 export async function getActivities(req, res) {
   const leadId = Number(req.params.id)
   if (!Number.isInteger(leadId)) return res.status(400).json({ error: 'ID inválido' })
@@ -665,6 +808,12 @@ export async function getActivities(req, res) {
   } catch (err) { res.status(500).json({ error: 'Erro ao buscar atividades' }) }
 }
 
+/**
+ * createActivity - cria uma atividade e registra log
+ *
+ * Locals:
+ * - leadId, type, description, scheduled_at, r, rows
+ */
 export async function createActivity(req, res) {
   const leadId = Number(req.params.id)
   if (!Number.isInteger(leadId)) return res.status(400).json({ error: 'ID inválido' })
@@ -691,6 +840,12 @@ export async function createActivity(req, res) {
   } catch (err) { res.status(500).json({ error: 'Erro ao criar atividade' }) }
 }
 
+/**
+ * toggleActivity - marca/desmarca atividade como feita e atualiza notas
+ *
+ * Locals:
+ * - actId, act, isDone, hasNote, note, updated
+ */
 export async function toggleActivity(req, res) {
   const actId = Number(req.params.actId)
   if (!Number.isInteger(actId)) return res.status(400).json({ error: 'ID inválido' })
@@ -727,6 +882,12 @@ export async function toggleActivity(req, res) {
 // "Dos X que entraram no estágio N, quantos avançaram para o estágio N+1?"
 // Usa crm_stage_logs para rastrear a jornada real de cada lead.
 
+/**
+ * getFunnelMetrics - calcula métricas do funil/coorte e previsões
+ *
+ * Locals:
+ * - sid, REAL_STAGES, firstEntries, leadJourneys, stageMetrics, PIPELINE
+ */
 export async function getFunnelMetrics(req, res) {
   const sid = req.schoolId
   const REAL_STAGES = ['NOVO','CONTATO','EXPERIMENTAL','PROPOSTA','MATRICULADO','PERDIDO']
@@ -876,6 +1037,12 @@ export async function getFunnelMetrics(req, res) {
 
 // ─── Feed / Archive ───────────────────────────────────────────────────────────
 
+/**
+ * getRecentFeed - retorna últimos logs de estágio
+ *
+ * Locals:
+ * - sid, rows
+ */
 export async function getRecentFeed(req, res) {
   const sid = req.schoolId
   try {
@@ -892,6 +1059,12 @@ export async function getRecentFeed(req, res) {
   } catch (err) { res.status(500).json({ error: 'Erro ao buscar feed' }) }
 }
 
+/**
+ * archiveEnrolled - arquiva leads matriculados antigos
+ *
+ * Locals:
+ * - sid, r
+ */
 export async function archiveEnrolled(req, res) {
   const sid = req.schoolId
   try {
@@ -905,6 +1078,12 @@ export async function archiveEnrolled(req, res) {
   } catch (err) { res.status(500).json({ error: 'Erro ao arquivar' }) }
 }
 
+/**
+ * archiveLost - arquiva leads perdidos antigos
+ *
+ * Locals:
+ * - sid, r
+ */
 export async function archiveLost(req, res) {
   const sid = req.schoolId
   try {

@@ -1,4 +1,14 @@
 import pool from '../database/connection.js'
+/**
+ * Common locals used across controllers:
+ * - sid: school id for the current request (from `req.schoolId`)
+ * - req.userId: id of the authenticated user
+ * - req.userRole / req.isTemp: auth metadata
+ * - t: short name for wildcard search values (`%term%`) when used
+ * - countQ / query: SQL query strings (countQ typically holds COUNT(*) SQL)
+ * - params: array of SQL parameter values
+ * - conn: DB connection from `pool.getConnection()` when using transactions
+ */
 
 const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
 
@@ -22,6 +32,14 @@ export async function ensureReportColumns() {
   }
 }
 
+/**
+ * enrollmentsByMonth - número de matrículas por mês para um ano
+ *
+ * Locals:
+ * - sid: school id
+ * - year: ano (req.query.year)
+ * - rows: result rows from query
+ */
 export async function enrollmentsByMonth(req, res) {
   const sid  = req.schoolId
   const year = Number(req.query.year) || new Date().getFullYear()
@@ -38,6 +56,12 @@ export async function enrollmentsByMonth(req, res) {
   } catch (e) { console.error(e); res.status(500).json({ error: 'Erro' }) }
 }
 
+/**
+ * cancellationsByMonth - cancelamentos por mês agrupados por motivo
+ *
+ * Locals:
+ * - sid, year, rows, reasons, data
+ */
 export async function cancellationsByMonth(req, res) {
   const sid  = req.schoolId
   const year = Number(req.query.year) || new Date().getFullYear()
@@ -61,6 +85,12 @@ export async function cancellationsByMonth(req, res) {
   } catch (e) { console.error(e); res.status(500).json({ error: 'Erro' }) }
 }
 
+/**
+ * attendanceAll - lista taxa de presença por aluno
+ *
+ * Locals:
+ * - sid, rows, data
+ */
 export async function attendanceAll(req, res) {
   const sid = req.schoolId
   try {
@@ -84,6 +114,12 @@ export async function attendanceAll(req, res) {
   } catch (e) { console.error(e); res.status(500).json({ error: 'Erro' }) }
 }
 
+/**
+ * yearReview - resumo anual de matrículas e cancelamentos
+ *
+ * Locals:
+ * - sid, year, enrRows, canRows, totalEnr, totalCan, data
+ */
 export async function yearReview(req, res) {
   const sid  = req.schoolId
   const year = Number(req.query.year) || new Date().getFullYear()
@@ -112,6 +148,12 @@ export async function yearReview(req, res) {
   } catch (e) { console.error(e); res.status(500).json({ error: 'Erro' }) }
 }
 
+/**
+ * secretaryRanking - ranking de secretárias por matrículas num mês
+ *
+ * Locals:
+ * - sid, month, year, rows
+ */
 export async function secretaryRanking(req, res) {
   const sid   = req.schoolId
   const month = Number(req.query.month) || new Date().getMonth() + 1
@@ -130,6 +172,12 @@ export async function secretaryRanking(req, res) {
   } catch (e) { console.error(e); res.status(500).json({ error: 'Erro' }) }
 }
 
+/**
+ * crmConversion - métricas de conversão do CRM (estágios, fontes)
+ *
+ * Locals:
+ * - sid, stageRows, archivedEnrolled, sourceRows, stageMap, totalLeads
+ */
 export async function crmConversion(req, res) {
   const sid = req.schoolId
   try {
@@ -155,6 +203,12 @@ export async function crmConversion(req, res) {
   } catch (e) { console.error(e); res.status(500).json({ error: 'Erro' }) }
 }
 
+/**
+ * citiesRanking - ranking de cidades por número de alunos ativos
+ *
+ * Locals:
+ * - sid, rows
+ */
 export async function citiesRanking(req, res) {
   const sid = req.schoolId
   try {

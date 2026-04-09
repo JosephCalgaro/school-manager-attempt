@@ -1,5 +1,21 @@
 import pool from '../database/connection.js'
+/**
+ * Common locals used across controllers:
+ * - sid: school id for the current request (from `req.schoolId`)
+ * - req.userId: id of the authenticated user
+ * - req.userRole / req.isTemp: auth metadata
+ * - t: short name for wildcard search values (`%term%`) when used
+ * - countQ / query: SQL query strings (countQ typically holds COUNT(*) SQL)
+ * - params: array of SQL parameter values
+ * - conn: DB connection from `pool.getConnection()` when using transactions
+ */
 
+/**
+ * isResponsible - middleware que garante role RESPONIBLE
+ *
+ * Locals:
+ * - req.userRole: role do usuário para validação
+ */
 export function isResponsible(req, res, next) {
   if (req.userRole !== 'RESPONSIBLE') {
     return res.status(403).json({ message: 'Acesso permitido apenas para responsáveis.' })
@@ -7,6 +23,12 @@ export function isResponsible(req, res, next) {
   next()
 }
 
+/**
+ * getMyProfileWithStudent - retorna perfil do responsável e um aluno vinculado
+ *
+ * Locals:
+ * - rows: query result rows
+ */
 export async function getMyProfileWithStudent(req, res) {
   try {
     const [rows] = await pool.query(
@@ -22,6 +44,12 @@ export async function getMyProfileWithStudent(req, res) {
   } catch (err) { res.status(500).json({ message: 'Erro ao buscar perfil' }) }
 }
 
+/**
+ * getMyStudents - lista alunos vinculados ao responsável
+ *
+ * Locals:
+ * - rows: query result rows
+ */
 export async function getMyStudents(req, res) {
   try {
     const [rows] = await pool.query(
@@ -35,6 +63,12 @@ export async function getMyStudents(req, res) {
   } catch (err) { res.status(500).json({ message: 'Erro ao buscar alunos' }) }
 }
 
+/**
+ * getMyStudentClasses - lista turmas dos alunos do responsável
+ *
+ * Locals:
+ * - rows: query result rows
+ */
 export async function getMyStudentClasses(req, res) {
   try {
     const [rows] = await pool.query(
@@ -52,6 +86,13 @@ export async function getMyStudentClasses(req, res) {
   } catch (err) { res.status(500).json({ message: 'Erro ao buscar turmas dos alunos' }) }
 }
 
+/**
+ * getMyStudentClassDetails - detalhes de uma turma, validando matrícula
+ *
+ * Locals:
+ * - enrolled: check row for enrollment
+ * - rows: class detail rows
+ */
 export async function getMyStudentClassDetails(req, res) {
   try {
     const [enrolled] = await pool.query(
@@ -72,6 +113,12 @@ export async function getMyStudentClassDetails(req, res) {
   } catch (err) { res.status(500).json({ message: 'Erro ao buscar detalhes da turma' }) }
 }
 
+/**
+ * getMyStudentAssignments - lista atividades dos alunos vinculados
+ *
+ * Locals:
+ * - rows: query result rows
+ */
 export async function getMyStudentAssignments(req, res) {
   try {
     const [rows] = await pool.query(

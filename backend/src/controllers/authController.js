@@ -1,4 +1,14 @@
 import pool from '../database/connection.js'
+/**
+ * Common locals used across controllers:
+ * - sid: school id for the current request (from `req.schoolId`)
+ * - req.userId: id of the authenticated user
+ * - req.userRole / req.isTemp: auth metadata
+ * - t: short name for wildcard search values (`%term%`) when used
+ * - countQ / query: SQL query strings (countQ typically holds COUNT(*) SQL)
+ * - params: array of SQL parameter values
+ * - conn: DB connection from `pool.getConnection()` when using transactions
+ */
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { recordFailedLogin, clearLoginAttempts } from '../middlewares/rateLimiter.js'
@@ -26,9 +36,32 @@ export function signToken(user) {
   )
 }
 
+/**
+ * signToken - gera um JWT para o usuário
+ *
+ * @param {Object} user - objeto de usuário (deve conter `id`, `role`, `school_id`, `is_temp`)
+ * @returns {string} token JWT assinado
+ *
+ * Locals:
+ * - sub: usuário `id` (sub claim)
+ * - role: função do usuário
+ * - school_id: id da escola atribuída ao token
+ * - is_temp: flag de token temporário (impersonation)
+ */
+
 export function verifyToken(token) {
   return jwt.verify(token, JWT_SECRET)
 }
+
+/**
+ * verifyToken - valida e decodifica um JWT
+ *
+ * @param {string} token - token JWT
+ * @returns {Object} payload decodificado
+ *
+ * Locals:
+ * - token: JWT recebido
+ */
 
 // POST /auth/login
 // Verifica primeiro na tabela users (admin/teacher/secretary),
@@ -129,6 +162,23 @@ export async function login(req, res) {
   }
 }
 
+/**
+ * login - endpoint de autenticação. tenta nas tabelas `users`, `students` e `responsibles` em ordem.
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * Locals:
+ * - email, password: credenciais recebidas via `req.body`
+ * - userRows, user: resultado da busca na tabela `users`
+ * - match: resultado do `bcrypt.compare`
+ * - token: JWT gerado por `signToken`
+ * - studentRows, student: resultado da busca na tabela `students`
+ * - respRows, resp: resultado da busca na tabela `responsibles`
+ * - getIp(req): helper para obter IP do cliente
+ */
+
 // GET /auth/profile
 // Retorna dados completos do usuário logado, independente da tabela de origem.
 export async function getProfile(req, res) {
@@ -218,3 +268,17 @@ export async function getProfile(req, res) {
     res.status(500).json({ error: 'Erro ao buscar perfil' })
   }
 }
+
+/**
+ * getProfile - retorna o perfil completo do usuário logado, consultando a tabela apropriada
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * Locals:
+ * - role: papel do usuário extraído de `req.userRole`
+ * - school: (para tokens temporários) row da tabela `schools`
+ * - rows/user: resultado(s) das queries dependendo do papel
+ * - classes: lista de turmas para professores
+ */

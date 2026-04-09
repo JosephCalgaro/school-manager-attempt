@@ -1,4 +1,14 @@
 import pool from '../database/connection.js'
+/**
+ * Common locals used across controllers:
+ * - sid: school id for the current request (from `req.schoolId`)
+ * - req.userId: id of the authenticated user
+ * - req.userRole / req.isTemp: auth metadata
+ * - t: short name for wildcard search values (`%term%`) when used
+ * - countQ / query: SQL query strings (countQ typically holds COUNT(*) SQL)
+ * - params: array of SQL parameter values
+ * - conn: DB connection from `pool.getConnection()` when using transactions
+ */
 
 // ─── Migration ────────────────────────────────────────────────────────────────
 
@@ -36,6 +46,13 @@ async function ensureInventoryTables() {
 
 // ─── Items ────────────────────────────────────────────────────────────────────
 
+/**
+ * getItems - retorna todos os itens do inventário
+ *
+ * Locals:
+ * - sid: school id
+ * - rows: query result rows
+ */
 export async function getItems(req, res) {
   const sid = req.schoolId
   try {
@@ -52,6 +69,15 @@ export async function getItems(req, res) {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao buscar itens' }) }
 }
 
+/**
+ * createItem - cria um novo item de inventário
+ *
+ * Locals:
+ * - sid: school id
+ * - name, category, unit, quantity, min_quantity, notes: body fields
+ * - r: insert result
+ * - rows: created item rows
+ */
 export async function createItem(req, res) {
   const sid = req.schoolId
   try {
@@ -69,6 +95,16 @@ export async function createItem(req, res) {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao criar item' }) }
 }
 
+/**
+ * updateItem - atualiza um item existente
+ *
+ * Locals:
+ * - id: item id (from params)
+ * - sid: school id
+ * - allowed: list of updatable fields
+ * - fields, values: update building arrays
+ * - rows: query result rows
+ */
 export async function updateItem(req, res) {
   const id = Number(req.params.id); const sid = req.schoolId
   if (!Number.isInteger(id)) return res.status(400).json({ error: 'ID inválido' })
@@ -86,6 +122,14 @@ export async function updateItem(req, res) {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao atualizar item' }) }
 }
 
+/**
+ * deleteItem - remove um item do inventário
+ *
+ * Locals:
+ * - id: item id (from params)
+ * - sid: school id
+ * - r: delete result
+ */
 export async function deleteItem(req, res) {
   const id = Number(req.params.id); const sid = req.schoolId
   if (!Number.isInteger(id)) return res.status(400).json({ error: 'ID inválido' })
@@ -98,6 +142,13 @@ export async function deleteItem(req, res) {
 
 // ─── Movements ────────────────────────────────────────────────────────────────
 
+/**
+ * getMovements - retorna movimentações de um item
+ *
+ * Locals:
+ * - itemId: item id (from params)
+ * - rows: query result rows
+ */
 export async function getMovements(req, res) {
   const itemId = Number(req.params.id)
   if (!Number.isInteger(itemId)) return res.status(400).json({ error: 'ID inválido' })
@@ -115,6 +166,18 @@ export async function getMovements(req, res) {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao buscar movimentações' }) }
 }
 
+/**
+ * registerMovement - registra entrada/saída de estoque
+ *
+ * Locals:
+ * - itemId: item id (from params)
+ * - sid: school id
+ * - type, quantity, notes: body fields
+ * - qty: normalized quantity number
+ * - conn: DB connection for transaction
+ * - item: locked item row
+ * - delta, r, mov, updatedItem: intermediate results
+ */
 export async function registerMovement(req, res) {
   const itemId = Number(req.params.id)
   if (!Number.isInteger(itemId)) return res.status(400).json({ error: 'ID inválido' })

@@ -1,6 +1,24 @@
 import pool from '../database/connection.js'
+/**
+ * Common locals used across controllers:
+ * - sid: school id for the current request (from `req.schoolId`)
+ * - req.userId: id of the authenticated user
+ * - req.userRole / req.isTemp: auth metadata
+ * - t: short name for wildcard search values (`%term%`) when used
+ * - countQ / query: SQL query strings (countQ typically holds COUNT(*) SQL)
+ * - params: array of SQL parameter values
+ * - conn: DB connection from `pool.getConnection()` when using transactions
+ */
 import bcrypt from 'bcryptjs'
 
+/**
+ * getAllResponsibles - lista responsáveis com filtros e paginação
+ *
+ * Locals:
+ * - sid: school id (req.schoolId)
+ * - search, status, limit, offset: query params
+ * - conditions, params, where, query, count, rows, totals
+ */
 export async function getAllResponsibles(req, res) {
   const sid = req.schoolId
   try {
@@ -22,6 +40,14 @@ export async function getAllResponsibles(req, res) {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao listar responsáveis' }) }
 }
 
+/**
+ * toggleResponsibleActive - alterna o status ativo/inativo de um responsável
+ *
+ * Locals:
+ * - sid: school id
+ * - r: row returned from select (is_active)
+ * - newStatus: toggled value
+ */
 export async function toggleResponsibleActive(req, res) {
   const sid = req.schoolId
   try {
@@ -33,6 +59,13 @@ export async function toggleResponsibleActive(req, res) {
   } catch (err) { res.status(500).json({ error: 'Erro ao alterar status' }) }
 }
 
+/**
+ * getResponsibleById - retorna dados de um responsável por id
+ *
+ * Locals:
+ * - sid: school id
+ * - rows: result rows from select
+ */
 export async function getResponsibleById(req, res) {
   const sid = req.schoolId
   try {
@@ -46,6 +79,15 @@ export async function getResponsibleById(req, res) {
   } catch (err) { res.status(500).json({ error: 'Erro ao buscar responsável' }) }
 }
 
+/**
+ * createResponsible - cria um responsável e retorna o id criado
+ *
+ * Locals:
+ * - full_name, cpf, rg, birth_date, address, email, phone, password: body fields
+ * - sid: school id
+ * - conn: DB connection
+ * - password_hash, result
+ */
 export async function createResponsible(req, res) {
   const { full_name, cpf, rg, birth_date, address, email, phone, password } = req.body || {}
   const sid = req.schoolId
@@ -70,6 +112,15 @@ export async function createResponsible(req, res) {
   } finally { conn.release() }
 }
 
+/**
+ * updateResponsible - atualiza campos de um responsável
+ *
+ * Locals:
+ * - full_name, cpf, rg, birth_date, address, email, phone, password: body fields
+ * - sid: school id
+ * - conn: DB connection
+ * - fields, values, result
+ */
 export async function updateResponsible(req, res) {
   const { full_name, cpf, rg, birth_date, address, email, phone, password } = req.body || {}
   const sid = req.schoolId
@@ -100,6 +151,13 @@ export async function updateResponsible(req, res) {
   } finally { conn.release() }
 }
 
+/**
+ * deleteResponsible - remove um responsável pelo id
+ *
+ * Locals:
+ * - sid: school id
+ * - result: delete result
+ */
 export async function deleteResponsible(req, res) {
   const sid = req.schoolId
   try {
@@ -109,6 +167,12 @@ export async function deleteResponsible(req, res) {
   } catch (err) { res.status(500).json({ error: 'Erro ao remover responsável' }) }
 }
 
+/**
+ * getStudentsByResponsibleId - lista alunos vinculados a um responsável
+ *
+ * Locals:
+ * - rows: students returned by select
+ */
 export async function getStudentsByResponsibleId(req, res) {
   try {
     const [rows] = await pool.query(

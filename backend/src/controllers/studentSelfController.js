@@ -1,5 +1,21 @@
 import pool from '../database/connection.js'
+/**
+ * Common locals used across controllers:
+ * - sid: school id for the current request (from `req.schoolId`)
+ * - req.userId: id of the authenticated user
+ * - req.userRole / req.isTemp: auth metadata
+ * - t: short name for wildcard search values (`%term%`) when used
+ * - countQ / query: SQL query strings (countQ typically holds COUNT(*) SQL)
+ * - params: array of SQL parameter values
+ * - conn: DB connection from `pool.getConnection()` when using transactions
+ */
 
+/**
+ * isStudent - middleware que garante role STUDENT
+ *
+ * Locals:
+ * - req.userRole: role do usuário para validação
+ */
 export function isStudent(req, res, next) {
   if (req.userRole !== 'STUDENT') {
     return res.status(403).json({ message: 'Acesso permitido apenas para alunos.' })
@@ -7,6 +23,12 @@ export function isStudent(req, res, next) {
   next()
 }
 
+/**
+ * getMyProfile - retorna perfil do aluno autenticado
+ *
+ * Locals:
+ * - rows: query result rows
+ */
 export async function getMyProfile(req, res) {
   try {
     const [rows] = await pool.query(
@@ -27,6 +49,12 @@ export async function getMyProfile(req, res) {
   }
 }
 
+/**
+ * getMyClasses - lista turmas do aluno
+ *
+ * Locals:
+ * - rows: query result rows
+ */
 export async function getMyClasses(req, res) {
   try {
     const [rows] = await pool.query(
@@ -46,6 +74,13 @@ export async function getMyClasses(req, res) {
   }
 }
 
+/**
+ * getMyClassDetails - detalhes de uma turma do aluno com atividades e arquivos
+ *
+ * Locals:
+ * - enrolled: check enrollment rows
+ * - classRows, assignments, assignmentIds, fileRows, fileMap, assignmentsWithFiles: intermediate values
+ */
 export async function getMyClassDetails(req, res) {
   try {
     const [enrolled] = await pool.query(
@@ -98,6 +133,12 @@ export async function getMyClassDetails(req, res) {
   }
 }
 
+/**
+ * getMyAssignments - lista atividades do aluno (todas as turmas)
+ *
+ * Locals:
+ * - rows: query result rows
+ */
 export async function getMyAssignments(req, res) {
   try {
     const [rows] = await pool.query(

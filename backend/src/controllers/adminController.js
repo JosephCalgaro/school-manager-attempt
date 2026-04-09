@@ -2,6 +2,14 @@ import bcrypt from 'bcryptjs';
 import pool from '../database/connection.js';
 
 // ============ CONTADORES ============
+
+/**
+ * getStats - retorna estatísticas da escola (total de alunos, usuários, turmas e usuários por função)
+ *
+ * @param {import('express').Request} req - objeto de requisição (deve conter `schoolId`)
+ * @param {import('express').Response} res - objeto de resposta
+ * @returns {Promise<void>}
+ */
 export const getStats = async (req, res) => {
   const sid = req.schoolId
   try {
@@ -17,6 +25,31 @@ export const getStats = async (req, res) => {
 }
 
 // ============ ALUNOS ============
+/**
+ * getAllStudents - lista alunos com filtros e paginação
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * Locals (const/let):
+ * - sid: school id for the current request
+ * - search: search string from `req.query.search`
+ * - status: filter from `req.query.status` ('active'|'inactive')
+ * - limit: requested page size from `req.query.limit`
+ * - offset: requested offset from `req.query.offset`
+ * - maxLimit: upper bound for `limit` to prevent large queries
+ * - safeLimit: sanitized `limit` used in SQL
+ * - safeOffset: sanitized `offset` used in SQL
+ * - conditions: array of SQL WHERE condition fragments
+ * - params: array of parameter values for the SQL query
+ * - t: wildcard search value used for LIKE queries (e.g. `%term%`)
+ * - where: assembled WHERE clause string (prefixed with ' WHERE ')
+ * - query: SQL string used to select student rows
+ * - countQ: SQL string used to count matching rows
+ * - students: result rows returned by the select query
+ * - countResult: result row returned by the count query
+ */
 export const getAllStudents = async (req, res) => {
   const sid = req.schoolId
   try {
@@ -46,6 +79,17 @@ export const getAllStudents = async (req, res) => {
   }
 }
 
+/**
+ * toggleStudentActive - alterna o status ativo/inativo de um aluno
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * Locals (const/let):
+ * - id, deactivation_reason, sid
+ * - s, newStatus, deactivatedAt
+ */
 export const toggleStudentActive = async (req, res) => {
   const { id } = req.params
   const { deactivation_reason } = req.body || {}
@@ -66,6 +110,17 @@ export const toggleStudentActive = async (req, res) => {
   }
 }
 
+/**
+ * getStudentDetails - busca detalhes de um aluno e seu responsável (se houver)
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * Locals (const/let):
+ * - sid (school id), students, student
+ * - responsible, resp
+ */
 export const getStudentDetails = async (req, res) => {
   const sid = req.schoolId
   try {
@@ -86,6 +141,26 @@ export const getStudentDetails = async (req, res) => {
   }
 }
 
+/**
+ * updateStudentDetails - atualiza campos do aluno e (opcionalmente) do responsável
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * Locals (const/let):
+ * - id: `req.params.id` (student id to update)
+ * - sid: school id for the current request
+ * - full_name, cpf, rg, birth_date, address, city, email, phone,
+ *   due_day, password, responsible, deactivation_reason: updatable fields from `req.body`
+ * - conn: DB connection used for the transaction
+ * - students: rows returned from the initial SELECT to verify existence
+ * - current: the current student row object
+ * - sf: array of student field SQL fragments to update (e.g. 'full_name = ?')
+ * - sv: array of student field values corresponding to `sf`
+ * - rf: array of responsible field SQL fragments to update
+ * - rv: array of responsible field values corresponding to `rf`
+ */
 export const updateStudentDetails = async (req, res) => {
   const { id } = req.params
   const sid     = req.schoolId
@@ -135,6 +210,16 @@ export const updateStudentDetails = async (req, res) => {
   } finally { if (conn) conn.release() }
 }
 
+/**
+ * getStudentClasses - retorna as turmas em que o aluno está matriculado
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * Locals (const/let):
+ * - sid (school id), classes
+ */
 export const getStudentClasses = async (req, res) => {
   const sid = req.schoolId
   try {
@@ -150,6 +235,24 @@ export const getStudentClasses = async (req, res) => {
   } catch (error) { res.status(500).json({ message: 'Erro ao buscar turmas do aluno' }) }
 }
 
+/**
+ * getStudentAttendance - retorna presença do aluno (opcionalmente filtrada por turma)
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * Locals (const/let):
+ * - sid: school id for the current request
+ * - id: `req.params.id` (student id)
+ * - classId: optional `req.query.classId` to filter attendance
+ * - query: SQL string built to fetch attendance rows
+ * - params: array of parameter values for the attendance query
+ * - attendance: result rows for attendance records
+ * - total: total number of attendance records returned
+ * - present: number of records where `present` is truthy
+ * - percentage: computed presence percentage (string with '%')
+ */
 export const getStudentAttendance = async (req, res) => {
   const sid = req.schoolId
   try {
@@ -168,6 +271,16 @@ export const getStudentAttendance = async (req, res) => {
   } catch (error) { res.status(500).json({ message: 'Erro ao buscar frequência do aluno' }) }
 }
 
+/**
+ * getStudentAssignments - obtém atividades e notas do aluno
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * Locals (const/let):
+ * - sid (school id), id, assignments
+ */
 export const getStudentAssignments = async (req, res) => {
   const sid = req.schoolId
   try {
@@ -187,6 +300,26 @@ export const getStudentAssignments = async (req, res) => {
   } catch (error) { res.status(500).json({ message: 'Erro ao buscar atividades do aluno' }) }
 }
 
+/**
+ * createStudent - cria um novo aluno e (opcionalmente) um responsável associado
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * Locals (const/let):
+ * - full_name, cpf, rg, birth_date, address, city, email, phone: student fields from `req.body`
+ * - due_day: billing day from `req.body`
+ * - password: raw password from `req.body` (will be hashed)
+ * - responsible: optional responsible object from `req.body`
+ * - sid: school id for the current request
+ * - conn: database connection obtained via `pool.getConnection()`
+ * - password_hash: bcrypt hash of the provided password
+ * - responsible_id: inserted responsible id (if a responsible was created)
+ * - resp_hash: bcrypt hash for responsible's password (if provided)
+ * - respResult: result object from inserting a responsible
+ * - result: result object from inserting the student
+ */
 export const createStudent = async (req, res) => {
   const { full_name, cpf, rg, birth_date, address, city, email, phone, due_day, password, responsible } = req.body || {}
   const sid = req.schoolId
@@ -228,6 +361,18 @@ export const createStudent = async (req, res) => {
 }
 
 // ============ USUÁRIOS ============
+/**
+ * getAllUsers - lista usuários da escola com filtros e paginação
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * Locals (const/let):
+ * - sid (school id), search, role, status, limit, offset
+ * - maxLimit, safeLimit, safeOffset
+ * - conditions, params, query, users, countResult
+ */
 export const getAllUsers = async (req, res) => {
   const sid = req.schoolId
   try {
@@ -253,6 +398,16 @@ export const getAllUsers = async (req, res) => {
   }
 }
 
+/**
+ * toggleUserActive - alterna status ativo/inativo de um usuário
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * Locals (const/let):
+ * - sid (school id), u, newStatus
+ */
 export const toggleUserActive = async (req, res) => {
   const sid = req.schoolId
   try {
@@ -281,6 +436,17 @@ export const toggleUserActive = async (req, res) => {
   }
 }
 
+/**
+ * getUserDetails - obtém informações detalhadas de um usuário (exclui SAAS_OWNER)
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * Locals (const/let):
+ * - sid (school id), users, user, classes
+ * - tc
+ */
 export const getUserDetails = async (req, res) => {
   const sid = req.schoolId
   try {
@@ -303,6 +469,17 @@ export const getUserDetails = async (req, res) => {
   }
 }
 
+/**
+ * createUser - cria um usuário com função válida e senha
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * Locals (const/let):
+ * - full_name, email, phone, cpf, rg, birth_date, role, password, sid
+ * - VALID_ROLES, password_hash, result
+ */
 export const createUser = async (req, res) => {
   const { full_name, email, phone, cpf, rg, birth_date, role, password } = req.body || {}
   const sid = req.schoolId
@@ -326,6 +503,17 @@ export const createUser = async (req, res) => {
   }
 }
 
+/**
+ * updateUser - atualiza campos de um usuário existente, protegendo SAAS_OWNER
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * Locals (const/let):
+ * - id, sid, full_name, email, phone, cpf, rg, birth_date, role, password, is_active
+ * - VALID_ROLES, target, fields, values
+ */
 export const updateUser = async (req, res) => {
   const { id } = req.params; const sid = req.schoolId
   const { full_name, email, phone, cpf, rg, birth_date, role, password, is_active } = req.body || {}
@@ -362,6 +550,16 @@ export const updateUser = async (req, res) => {
 }
 
 // ============ TURMAS ============
+/**
+ * getSecretaryStats - estatísticas resumidas para secretarias
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * Locals (const/let):
+ * - sid (school id), totalStudents, newThisMonth, months
+ */
 export const getSecretaryStats = async (req, res) => {
   const sid = req.schoolId
   try {
@@ -379,6 +577,16 @@ export const getSecretaryStats = async (req, res) => {
   }
 }
 
+/**
+ * getAllClasses - lista turmas com filtros
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * Locals (const/let):
+ * - sid (school id), search, status, conditions, params, where, query, classes
+ */
 export const getAllClasses = async (req, res) => {
   const sid = req.schoolId
   try {
@@ -402,6 +610,17 @@ export const getAllClasses = async (req, res) => {
   }
 }
 
+/**
+ * createClass - cria uma turma e associa alunos opcionais
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * Locals (const/let):
+ * - name, schedule, teacher_id, classroom, students, sid
+ * - conn, result, classId, rows
+ */
 export const createClass = async (req, res) => {
   const { name, schedule, teacher_id, classroom, students } = req.body || {}
   const sid = req.schoolId
@@ -427,6 +646,17 @@ export const createClass = async (req, res) => {
   } finally { conn.release() }
 }
 
+/**
+ * updateClass - atualiza dados da turma e substitui lista de alunos quando fornecida
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * Locals (const/let):
+ * - id, sid, name, schedule, teacher_id, classroom, is_active, students
+ * - conn, fields, values, cls, rows
+ */
 export const updateClass = async (req, res) => {
   const { id } = req.params; const sid = req.schoolId
   const { name, schedule, teacher_id, classroom, is_active, students } = req.body || {}
@@ -459,6 +689,16 @@ export const updateClass = async (req, res) => {
   } finally { conn.release() }
 }
 
+/**
+ * toggleClassActive - alterna status ativo/inativo de uma turma
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * Locals (const/let):
+ * - sid (school id), cls, newStatus
+ */
 export const toggleClassActive = async (req, res) => {
   const sid = req.schoolId
   try {
@@ -473,6 +713,16 @@ export const toggleClassActive = async (req, res) => {
   }
 }
 
+/**
+ * getClassStudentsList - lista alunos de uma turma (verifica pertença à escola)
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * Locals (const/let):
+ * - sid (school id), cls, students
+ */
 export const getClassStudentsList = async (req, res) => {
   const sid = req.schoolId
   try {
@@ -489,6 +739,16 @@ export const getClassStudentsList = async (req, res) => {
   } catch (error) { res.status(500).json({ message: 'Erro ao listar alunos da turma' }) }
 }
 
+/**
+ * addStudentToClass - adiciona um aluno a uma turma validando pertença à escola
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * Locals (const/let):
+ * - student_id, sid, cls, stu
+ */
 export const addStudentToClass = async (req, res) => {
   const { student_id } = req.body || {}
   const sid = req.schoolId
@@ -504,6 +764,16 @@ export const addStudentToClass = async (req, res) => {
   } catch (error) { res.status(500).json({ message: 'Erro ao adicionar aluno' }) }
 }
 
+/**
+ * removeStudentFromClass - remove um aluno de uma turma (verifica pertença à escola)
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * Locals (const/let):
+ * - sid (school id), cls
+ */
 export const removeStudentFromClass = async (req, res) => {
   const sid = req.schoolId
   try {

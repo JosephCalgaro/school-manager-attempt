@@ -1,4 +1,14 @@
 import pool from '../database/connection.js'
+/**
+ * Common locals used across controllers:
+ * - sid: school id for the current request (from `req.schoolId`)
+ * - req.userId: id of the authenticated user
+ * - req.userRole / req.isTemp: auth metadata
+ * - t: short name for wildcard search values (`%term%`) when used
+ * - countQ / query: SQL query strings (countQ typically holds COUNT(*) SQL)
+ * - params: array of SQL parameter values
+ * - conn: DB connection from `pool.getConnection()` when using transactions
+ */
 import fs from 'fs/promises'
 import path from 'path'
 
@@ -245,6 +255,13 @@ async function getTeacherClassesWithStats(teacherId, userRole, schoolId) {
   return rows
 }
 
+/**
+ * getTeacherStudents - lista alunos do professor
+ *
+ * Locals:
+ * - sid: school id
+ * - teacherId, rows: intermediate values
+ */
 export async function getTeacherStudents(req, res) {
   const sid = req.schoolId
   try {
@@ -406,6 +423,12 @@ function addNotesToStudents(students, notes) {
   })
 }
 
+/**
+ * isTeacher - middleware que permite professores e admins
+ *
+ * Locals:
+ * - req.userRole: role do usuário para validação
+ */
 export function isTeacher(req, res, next) {
   if (!isTeacherRole(req.userRole) && !isAdminRole(req.userRole)) {
     return res.status(403).json({ error: 'Acesso negado. Apenas professores ou administradores.' })
@@ -413,6 +436,12 @@ export function isTeacher(req, res, next) {
   next()
 }
 
+/**
+ * getTeacherStats - estatísticas agregadas do professor
+ *
+ * Locals:
+ * - sid, teacherId, isAdmin, classes, studentsRows, assignmentsRows
+ */
 export async function getTeacherStats(req, res) {
   const sid = req.schoolId
   try {
@@ -448,6 +477,12 @@ export async function getTeacherStats(req, res) {
   }
 }
 
+/**
+ * getTeacherClasses - retorna turmas do professor com estatísticas
+ *
+ * Locals:
+ * - classes: result from helper getTeacherClassesWithStats
+ */
 export async function getTeacherClasses(req, res) {
   try {
     const classes = await getTeacherClassesWithStats(req.userId, req.userRole, req.schoolId)
@@ -458,6 +493,12 @@ export async function getTeacherClasses(req, res) {
   }
 }
 
+/**
+ * getTeacherClassById - detalhes de uma turma do professor
+ *
+ * Locals:
+ * - classId, classInfo, totalStudents, attendanceRate, students, assignments, notes
+ */
 export async function getTeacherClassById(req, res) {
   const classId = Number(req.params.id)
   if (!Number.isInteger(classId)) {
@@ -520,6 +561,12 @@ export async function getTeacherClassById(req, res) {
   }
 }
 
+/**
+ * getTeacherClassStudents - retorna alunos e atividades de uma turma
+ *
+ * Locals:
+ * - classId, classInfo, students, assignments, notes
+ */
 export async function getTeacherClassStudents(req, res) {
   const classId = Number(req.params.id)
   if (!Number.isInteger(classId)) {
@@ -547,6 +594,12 @@ export async function getTeacherClassStudents(req, res) {
   }
 }
 
+/**
+ * registerClassAttendance - registra presença em lote para uma turma
+ *
+ * Locals:
+ * - classId, records, classInfo, studentRows, studentIds, conn, existingRows
+ */
 export async function registerClassAttendance(req, res) {
   const classId = Number(req.params.id)
   const records = Array.isArray(req.body) ? req.body : req.body?.records
@@ -626,6 +679,12 @@ export async function registerClassAttendance(req, res) {
   }
 }
 
+/**
+ * upsertClassGrade - insere/atualiza nota de um aluno para uma atividade
+ *
+ * Locals:
+ * - classId, studentId, assignmentId, score, classInfo, gradeCols, assignmentRows, studentRows, gradeRows
+ */
 export async function upsertClassGrade(req, res) {
   const classId = Number(req.params.id)
   const { studentId, assignmentId, score } = req.body || {}
@@ -728,6 +787,12 @@ export async function upsertClassGrade(req, res) {
   }
 }
 
+/**
+ * upsertStudentNotes - insere/atualiza notas do aluno na turma
+ *
+ * Locals:
+ * - classId, studentId, note1, note2, note3, n1, n2, n3
+ */
 export async function upsertStudentNotes(req, res) {
   const classId = Number(req.params.id)
   const { studentId, note1, note2, note3 } = req.body || {}
@@ -781,6 +846,12 @@ export async function upsertStudentNotes(req, res) {
   }
 }
 
+/**
+ * upsertAssignmentCompletions - atualiza realização de atividade por aluno
+ *
+ * Locals:
+ * - classId, assignmentId, records, classInfo, assignmentRows, studentRows
+ */
 export async function upsertAssignmentCompletions(req, res) {
   const classId = Number(req.params.id)
   const assignmentId = Number(req.params.assignmentId)
@@ -838,6 +909,12 @@ export async function upsertAssignmentCompletions(req, res) {
   }
 }
 
+/**
+ * createClassAssignment - cria atividade vinculada à turma
+ *
+ * Locals:
+ * - classId, title, description, dueDate, type, maxScore, files, classInfo, parsedMaxScore, result, savedFiles
+ */
 export async function createClassAssignment(req, res) {
   const classId = Number(req.params.id)
   const { title, description, dueDate, type, maxScore, files } = req.body || {}
@@ -894,6 +971,12 @@ export async function createClassAssignment(req, res) {
   }
 }
 
+/**
+ * updateClassAssignment - atualiza atividade da turma
+ *
+ * Locals:
+ * - classId, assignmentId, fields, values, existsRows, savedFiles
+ */
 export async function updateClassAssignment(req, res) {
   const classId = Number(req.params.id)
   const assignmentId = Number(req.params.assignmentId)
@@ -982,6 +1065,12 @@ export async function updateClassAssignment(req, res) {
   }
 }
 
+/**
+ * deleteClassAssignment - remove atividade e arquivos associados
+ *
+ * Locals:
+ * - classId, assignmentId, filesRows, result
+ */
 export async function deleteClassAssignment(req, res) {
   const classId = Number(req.params.id)
   const assignmentId = Number(req.params.assignmentId)
@@ -1093,6 +1182,12 @@ async function ensureLessonPlanTables() {
 // ── TEMPLATES (biblioteca do professor) ──────────────────────────────────────
 
 // GET /teacher/lesson-plans
+/**
+ * getMyTemplates - lista templates de plano de aula do professor
+ *
+ * Locals:
+ * - sid, teacherId, rows
+ */
 export async function getMyTemplates(req, res) {
   const sid = req.schoolId
   try {
@@ -1125,6 +1220,12 @@ export async function getMyTemplates(req, res) {
 }
 
 // POST /teacher/lesson-plans
+/**
+ * createTemplate - cria template de plano de aula para professor
+ *
+ * Locals:
+ * - sid, title, description, custom_sections, result, rows
+ */
 export async function createTemplate(req, res) {
   const { title, description, warm_up, ice_breaker, development, language_awareness, closure, custom_sections } = req.body || {}
   const sid = req.schoolId
@@ -1150,6 +1251,12 @@ export async function createTemplate(req, res) {
 }
 
 // PUT /teacher/lesson-plans/:templateId
+/**
+ * updateTemplate - atualiza template de plano de aula
+ *
+ * Locals:
+ * - templateId, sid, whereClause, whereParams, existing, fields, values
+ */
 export async function updateTemplate(req, res) {
   const templateId = Number(req.params.templateId)
   const { title, description, warm_up, ice_breaker, development, language_awareness, closure, custom_sections } = req.body || {}
@@ -1186,6 +1293,12 @@ export async function updateTemplate(req, res) {
 }
 
 // DELETE /teacher/lesson-plans/:templateId
+/**
+ * deleteTemplate - remove template e desvincula da turma
+ *
+ * Locals:
+ * - templateId, sid, result
+ */
 export async function deleteTemplate(req, res) {
   const templateId = Number(req.params.templateId)
   const sid = req.schoolId
@@ -1210,6 +1323,12 @@ export async function deleteTemplate(req, res) {
 // ── VÍNCULOS (instâncias por turma) ──────────────────────────────────────────
 
 // GET /teacher/classes/:id/lesson-plans
+/**
+ * getLessonPlans - lista planos vinculados a uma turma
+ *
+ * Locals:
+ * - classId, classInfo, rows
+ */
 export async function getLessonPlans(req, res) {
   const classId = Number(req.params.id)
   if (!Number.isInteger(classId)) return res.status(400).json({ error: 'ID inválido' })
@@ -1237,6 +1356,12 @@ export async function getLessonPlans(req, res) {
 }
 
 // POST /teacher/classes/:id/lesson-plans  (vincular template a turma)
+/**
+ * createLessonPlan - vincula template a turma (cria plan)
+ *
+ * Locals:
+ * - classId, template_id, planned_date, classInfo, tRows, result, rows
+ */
 export async function createLessonPlan(req, res) {
   const classId = Number(req.params.id)
   const { template_id, planned_date } = req.body || {}
@@ -1271,6 +1396,12 @@ export async function createLessonPlan(req, res) {
 }
 
 // PUT /teacher/classes/:id/lesson-plans/:planId  (status / completion_notes / data)
+/**
+ * updateLessonPlan - atualiza vínculo de plano (status/completion)
+ *
+ * Locals:
+ * - classId, planId, fields, values, existing, rows
+ */
 export async function updateLessonPlan(req, res) {
   const classId = Number(req.params.id)
   const planId  = Number(req.params.planId)
@@ -1312,6 +1443,12 @@ export async function updateLessonPlan(req, res) {
 }
 
 // DELETE /teacher/classes/:id/lesson-plans/:planId  (desvincular)
+/**
+ * deleteLessonPlan - remove vínculo de plano da turma
+ *
+ * Locals:
+ * - classId, planId, classInfo, result
+ */
 export async function deleteLessonPlan(req, res) {
   const classId = Number(req.params.id)
   const planId  = Number(req.params.planId)

@@ -1,4 +1,14 @@
 import pool  from '../database/connection.js'
+/**
+ * Common locals used across controllers:
+ * - sid: school id for the current request (from `req.schoolId`)
+ * - req.userId: id of the authenticated user
+ * - req.userRole / req.isTemp: auth metadata
+ * - t: short name for wildcard search values (`%term%`) when used
+ * - countQ / query: SQL query strings (countQ typically holds COUNT(*) SQL)
+ * - params: array of SQL parameter values
+ * - conn: DB connection from `pool.getConnection()` when using transactions
+ */
 import jwt   from 'jsonwebtoken'
 import { logEvent } from '../middlewares/logger.js'
 
@@ -26,6 +36,12 @@ function signTempToken(saasOwner, schoolId, expiresIn = `${TEMP_EXPIRES_H}h`) {
 }
 
 // ─── Dashboard geral do SaaS owner ───────────────────────────────────────────
+/**
+ * getSaasDashboard - dashboard agregadoo para o SaaS owner
+ *
+ * Locals:
+ * - totals, topSchools, monthlyEnrollments, monthlySchools: query results
+ */
 export async function getSaasDashboard(req, res) {
   try {
     const [[totals]] = await pool.query(`
@@ -76,6 +92,13 @@ export async function getSaasDashboard(req, res) {
 }
 
 // ─── Detalhes de uma escola específica ───────────────────────────────────────
+/**
+ * getSchoolDetails - detalhes e contagens de uma escola específica
+ *
+ * Locals:
+ * - id: escola id (from params)
+ * - school, counts, recentStudents: query results
+ */
 export async function getSchoolDetails(req, res) {
   const id = Number(req.params.id)
   if (!Number.isInteger(id)) return res.status(400).json({ error: 'ID inválido' })
@@ -123,6 +146,13 @@ export async function getSchoolDetails(req, res) {
 //      então recebemos o saas_owner_id opcionalmente no body, ou buscamos pelo email)
 //   3. Gera token JWT com role=ADMIN + school_id=escola + is_temp=true
 //   4. Nenhum user é criado/modificado no banco
+/**
+ * impersonateSchool - gera token temporário para acessar escola como ADMIN
+ *
+ * Locals:
+ * - id: escola id (from params)
+ * - school, saasOwners, saasOwner, expiresAt, token: intermediate values
+ */
 export async function impersonateSchool(req, res) {
   const id = Number(req.params.id)
   if (!Number.isInteger(id)) return res.status(400).json({ error: 'ID inválido' })
@@ -180,6 +210,12 @@ export async function impersonateSchool(req, res) {
 }
 
 // ─── Revogar impersonação (apenas loga — o token expira sozinho) ──────────────
+/**
+ * revokeImpersonation - revoga impersonação (log apenas)
+ *
+ * Locals:
+ * - id: escola id (from params)
+ */
 export async function revokeImpersonation(req, res) {
   const id = Number(req.params.id)
   if (!Number.isInteger(id)) return res.status(400).json({ error: 'ID inválido' })
