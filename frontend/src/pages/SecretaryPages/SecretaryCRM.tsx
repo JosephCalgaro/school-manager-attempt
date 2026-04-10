@@ -4,13 +4,14 @@ import {
   LuMessageSquare, LuCalendarDays, LuCheck, LuClock,
   LuTrash2, LuPencil, LuCircleAlert, LuBookOpen, LuArchive, LuSave,
   LuBell, LuList, LuLayoutDashboard, LuActivity, LuFilter, LuTag,
-  LuChartBar, LuTrendingUp, LuTarget, LuRotateCcw, LuTriangleAlert,
+  LuChartBar, LuTrendingUp, LuTarget, LuRotateCcw, LuTriangleAlert, LuDownload,
 } from 'react-icons/lu'
 import { TbFlame } from 'react-icons/tb'
 import { FaThermometerHalf, FaSnowflake } from 'react-icons/fa'
 import { useAuth } from '../../hooks/useAuth'
 import PageMeta from '../../components/common/PageMeta'
 import { useCountdown, formatCountdown, countdownColor } from '../../hooks/useCountdown'
+import ExportModal, { DataSourceConfig } from '../../components/export/ExportModal'
 
 // --- Types ---
 
@@ -1162,6 +1163,44 @@ function FeedPanel({ authFetch, apiBase, onClose }: {
   )
 }
 
+// --- Export Config ---
+
+function crmExportConfig(apiBase: string): DataSourceConfig {
+  return {
+  label: 'Leads do CRM',
+  apiEndpoint: `${apiBase}/crm/leads?limit=500`,
+  dataKey: 'data',
+  columns: [
+    { key: 'name', label: 'Nome' },
+    { key: 'phone', label: 'Telefone' },
+    { key: 'email', label: 'E-mail' },
+    { key: 'cpf', label: 'CPF' },
+    { key: 'rg', label: 'RG' },
+    { key: 'student_name', label: 'Nome do Aluno' },
+    { key: 'age_range', label: 'Faixa Etaria' },
+    { key: 'source', label: 'Origem' },
+    { key: 'stage', label: 'Estagio' },
+    { key: 'lost_reason', label: 'Motivo da Perda' },
+    { key: 'notes', label: 'Observacoes' },
+    { key: 'tags', label: 'Tags' },
+    { key: 'assigned_name', label: 'Responsavel' },
+    { key: 'score', label: 'Score' },
+    { key: 'temperature', label: 'Temperatura' },
+    { key: 'expected_enrollment_date', label: 'Previsao Matricula' },
+    { key: 'follow_up_at', label: 'Agendamento Contato' },
+    { key: 'total_activities', label: 'Total Atividades' },
+    { key: 'pending_followups', label: 'Follow-ups Pendentes' },
+    { key: 'done_followups', label: 'Follow-ups Concluidos' },
+    { key: 'next_followup', label: 'Proximo Follow-up' },
+    { key: 'next_exp_class', label: 'Proxima Aula Exp.' },
+    { key: 'pending_exp_classes', label: 'Aulas Exp. Pendentes' },
+    { key: 'done_exp_classes', label: 'Aulas Exp. Concluidas' },
+    { key: 'created_at', label: 'Criado Em' },
+    { key: 'updated_at', label: 'Atualizado Em' },
+  ],
+  }
+}
+
 // --- Main Page ---
 
 export default function SecretaryCRM({ apiBase = '/secretary' }: { apiBase?: string }) {
@@ -1173,6 +1212,7 @@ export default function SecretaryCRM({ apiBase = '/secretary' }: { apiBase?: str
   const [showFeed, setShowFeed]   = useState(false)
   const [showFunnel, setShowFunnel]   = useState(false)
   const [showArchive, setShowArchive] = useState(false)
+  const [showExport, setShowExport]   = useState(false)
   const [filter, setFilter]       = useState<Stage | 'ALL'>('ALL')
   const [globalSearch, setGlobalSearch] = useState('')
   const [listSearch, setListSearch]     = useState('')
@@ -1348,6 +1388,10 @@ export default function SecretaryCRM({ apiBase = '/secretary' }: { apiBase?: str
             <button onClick={() => setShowFeed(true)}
               className="flex shrink-0 items-center gap-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 hover:border-brand-300 transition-colors">
               <LuActivity className="h-3.5 w-3.5" /> Feed
+            </button>
+            <button onClick={() => setShowExport(true)}
+              className="flex shrink-0 items-center gap-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 hover:border-brand-300 transition-colors">
+              <LuDownload className="h-3.5 w-3.5" /> Exportar
             </button>
             <button onClick={() => setNewModal(true)}
               className="flex shrink-0 items-center gap-2 rounded-xl bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 shadow-sm">
@@ -1581,6 +1625,15 @@ export default function SecretaryCRM({ apiBase = '/secretary' }: { apiBase?: str
           <ArchivedPanel authFetch={authFetch} apiBase={apiBase} onClose={() => setShowArchive(false)}
             onOpenLead={lead => { setOpenLead(normalizeLead(lead)); setShowArchive(false) }}
             onReactivated={() => load()} />
+        )}
+        {showExport && (
+          <ExportModal
+            isOpen={showExport}
+            onClose={() => setShowExport(false)}
+            apiBase={apiBase}
+            dataSource={crmExportConfig(apiBase)}
+            defaultFilename="leads-crm"
+          />
         )}
       </div>
     </>
