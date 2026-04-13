@@ -644,41 +644,25 @@ export async function registerClassAttendance(req, res) {
       }
     }
 
-    const conn = await pool.getConnection()
     try {
-      await conn.beginTransaction()
-
-      for (const item of records) {
-        const studentId = Number(item.studentId)
-        const date = item.date || new Date().toISOString().slice(0, 10)
-        const present = item.present ? 1 : 0
-
-        const [existingRows] = await conn.query(
-          'SELECT id FROM attendance WHERE class_id = ? AND student_id = ? AND date = ? ORDER BY id DESC LIMIT 1',
-          [classId, studentId, date]
-        )
-
-        if (existingRows.length > 0) {
-          await conn.query(
-            'UPDATE attendance SET present = ? WHERE id = ?',
-            [present, existingRows[0].id]
-          )
-        } else {
-          await conn.query(
-            'INSERT INTO attendance (class_id, student_id, date, present) VALUES (?, ?, ?, ?)',
-            [classId, studentId, date, present]
-          )
-        }
-      }
-
-      await conn.commit()
+      // Bulk upsert — 1 query para N alunos (requer UNIQUE KEY uq_attendance em indexes.js)
+      const today = new Date().toISOString().slice(0, 10)
+      const rows = records.map(item => [
+        classId,
+        Number(item.studentId),
+        item.date || today,
+        item.present ? 1 : 0
+      ])
+      await pool.query(
+        `INSERT INTO attendance (class_id, student_id, date, present)
+         VALUES ?
+         ON DUPLICATE KEY UPDATE present = VALUES(present)`,
+        [rows]
+      )
       return res.status(201).json({ message: 'Presença registrada com sucesso' })
     } catch (error) {
-      await conn.rollback()
       console.error(error)
       return res.status(500).json({ error: 'Erro ao registrar presença' })
-    } finally {
-      conn.release()
     }
   } catch (error) {
     console.error(error)
@@ -891,6 +875,8 @@ export async function upsertAssignmentCompletions(req, res) {
     const studentIds = new Set(studentRows.map((row) => Number(row.studentId)))
 
     await ensureAssignmentCompletionsTable()
+
+    // Validação antes do bulk insert
     for (const item of records) {
       if (!Number.isInteger(Number(item.studentId))) {
         return res.status(400).json({ error: 'studentId inválido em records' })
@@ -901,14 +887,16 @@ export async function upsertAssignmentCompletions(req, res) {
       if (!studentIds.has(Number(item.studentId))) {
         return res.status(400).json({ error: `Aluno ${item.studentId} não pertence a esta turma` })
       }
-
-      await pool.query(
-        `INSERT INTO assignment_completions (assignment_id, student_id, completed)
-         VALUES (?, ?, ?)
-         ON DUPLICATE KEY UPDATE completed = VALUES(completed)`,
-        [assignmentId, Number(item.studentId), item.completed ? 1 : 0]
-      )
     }
+
+    // Bulk upsert — 1 query para N alunos
+    const rows = records.map(item => [assignmentId, Number(item.studentId), item.completed ? 1 : 0])
+    await pool.query(
+      `INSERT INTO assignment_completions (assignment_id, student_id, completed)
+       VALUES ?
+       ON DUPLICATE KEY UPDATE completed = VALUES(completed)`,
+      [rows]
+    )
 
     res.status(201).json({ message: 'Realização da atividade atualizada com sucesso' })
   } catch (error) {

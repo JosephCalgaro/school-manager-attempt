@@ -13,11 +13,18 @@ import pool from '../database/connection.js';
 export const getStats = async (req, res) => {
   const sid = req.schoolId
   try {
-    const [[{ totalStudents }]] = await pool.query('SELECT COUNT(*) as totalStudents FROM students WHERE school_id = ?', [sid])
-    const [[{ totalUsers }]]    = await pool.query("SELECT COUNT(*) as totalUsers FROM users WHERE school_id = ? AND role != 'SAAS_OWNER'", [sid])
-    const [[{ totalClasses }]]  = await pool.query('SELECT COUNT(*) as totalClasses FROM classes WHERE school_id = ?', [sid])
-    const [usersByRole]         = await pool.query("SELECT role, COUNT(*) as count FROM users WHERE school_id = ? AND role != 'SAAS_OWNER' GROUP BY role", [sid])
-    res.json({ totalStudents, totalUsers, totalClasses, usersByRole })
+    const [[stats]] = await pool.query(
+      `SELECT
+        (SELECT COUNT(*) FROM students WHERE school_id = ?) AS totalStudents,
+        (SELECT COUNT(*) FROM users WHERE school_id = ? AND role != 'SAAS_OWNER') AS totalUsers,
+        (SELECT COUNT(*) FROM classes WHERE school_id = ?) AS totalClasses`,
+      [sid, sid, sid]
+    )
+    const [usersByRole] = await pool.query(
+      "SELECT role, COUNT(*) as count FROM users WHERE school_id = ? AND role != 'SAAS_OWNER' GROUP BY role",
+      [sid]
+    )
+    res.json({ ...stats, usersByRole })
   } catch (error) {
     console.error('Erro ao buscar estatísticas:', error)
     res.status(500).json({ message: 'Erro ao buscar estatísticas' })
@@ -124,16 +131,39 @@ export const toggleStudentActive = async (req, res) => {
 export const getStudentDetails = async (req, res) => {
   const sid = req.schoolId
   try {
-    const [students] = await pool.query('SELECT * FROM students WHERE id = ? AND school_id = ?', [req.params.id, sid])
-    if (!students.length) return res.status(404).json({ message: 'Aluno não encontrado' })
-    const student = students[0]
+    const [[student]] = await pool.query(
+      `SELECT s.*,
+              r.full_name  AS resp_full_name,
+              r.email      AS resp_email,
+              r.phone      AS resp_phone,
+              r.cpf        AS resp_cpf,
+              r.rg         AS resp_rg,
+              r.birth_date AS resp_birth_date,
+              r.address    AS resp_address
+       FROM students s
+       LEFT JOIN responsibles r ON r.id = s.responsible_id
+       WHERE s.id = ? AND s.school_id = ?`,
+      [req.params.id, sid]
+    )
+    if (!student) return res.status(404).json({ message: 'Aluno não encontrado' })
     delete student.password_hash
+
+    // Monta objeto responsible apenas se existir
     let responsible = null
     if (student.responsible_id) {
-      const [resp] = await pool.query('SELECT * FROM responsibles WHERE id = ?', [student.responsible_id])
-      responsible = resp[0] || null
-      if (responsible) delete responsible.password_hash
+      responsible = {
+        full_name:  student.resp_full_name,
+        email:      student.resp_email,
+        phone:      student.resp_phone,
+        cpf:        student.resp_cpf,
+        rg:         student.resp_rg,
+        birth_date: student.resp_birth_date,
+        address:    student.resp_address,
+      }
     }
+    // Remove campos resp_* do objeto raiz
+    Object.keys(student).filter(k => k.startsWith('resp_')).forEach(k => delete student[k])
+
     res.json({ ...student, responsible })
   } catch (error) {
     console.error('Erro ao buscar detalhes do aluno:', error)

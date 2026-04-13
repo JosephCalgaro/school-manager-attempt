@@ -4,6 +4,7 @@ import cors    from 'cors'
 
 import pool from './database/connection.js'
 import { ensureContactColumns }           from './database/migrations.js'
+import { ensureIndexes }                  from './database/indexes.js'
 import { initCrmTables }                  from './controllers/crmController.js'
 import { authenticate }                   from './middlewares/auth.js'
 import { requestLogger, errorHandler }    from './middlewares/logger.js'
@@ -41,6 +42,9 @@ ensureContactColumns().catch((error) => {
 })
 initCrmTables().catch((error) => {
   console.error('Erro ao inicializar tabelas CRM:', error)
+})
+ensureIndexes().catch((error) => {
+  console.error('Erro ao aplicar índices:', error)
 })
 
 // ─── Rotas públicas ───────────────────────────────────────────────────────────

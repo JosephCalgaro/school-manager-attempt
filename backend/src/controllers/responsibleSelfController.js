@@ -81,10 +81,9 @@ export async function getMyStudentClasses(req, res) {
       `SELECT c.id, c.name, c.schedule, u.full_name AS teacher_name
        FROM classes c
        INNER JOIN class_students cs ON c.id = cs.class_id
+       INNER JOIN students s ON s.id = cs.student_id AND s.responsible_id = ? AND s.school_id = ?
        LEFT JOIN users u ON c.teacher_id = u.id
-       WHERE cs.student_id IN (
-         SELECT id FROM students WHERE responsible_id = ? AND school_id = ?
-       ) AND c.school_id = ?
+       WHERE c.school_id = ?
        ORDER BY c.name`,
       [req.userId, req.schoolId, req.schoolId]
     )
