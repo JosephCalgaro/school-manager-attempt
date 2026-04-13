@@ -7,3 +7,5 @@ floating-dancing-galaxy.md
 .agents
 skills-lock.json
 AGENTS.md
+node_modules/
+.gitignore

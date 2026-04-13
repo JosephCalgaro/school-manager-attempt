@@ -177,8 +177,8 @@ export async function getStudentsByResponsibleId(req, res) {
   try {
     const [rows] = await pool.query(
       `SELECT id, full_name, cpf, rg, email, phone, birth_date, address
-       FROM students WHERE responsible_id = ?`,
-      [req.params.id]
+       FROM students WHERE responsible_id = ? AND school_id = ?`,
+      [req.params.id, req.schoolId]
     )
     res.json(rows)
   } catch (err) { res.status(500).json({ error: 'Erro ao buscar alunos do responsável' }) }

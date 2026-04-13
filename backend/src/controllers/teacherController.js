@@ -1281,7 +1281,14 @@ export async function updateTemplate(req, res) {
     if (custom_sections    !== undefined) { fields.push('custom_sections = ?');    values.push(custom_sections ? JSON.stringify(custom_sections) : null) }
     if (fields.length === 0) return res.status(400).json({ error: 'Nenhum campo para atualizar' })
 
-    await pool.query(`UPDATE lesson_plan_templates SET ${fields.join(', ')} WHERE id = ? AND school_id = ?`, [...values, templateId, sid])
+    const updateWhere  = isAdminRole(req.userRole)
+      ? 'WHERE id = ? AND school_id = ?'
+      : 'WHERE id = ? AND teacher_id = ? AND school_id = ?'
+    const updateParams = isAdminRole(req.userRole)
+      ? [...values, templateId, sid]
+      : [...values, templateId, req.userId, sid]
+
+    await pool.query(`UPDATE lesson_plan_templates SET ${fields.join(', ')} ${updateWhere}`, updateParams)
     const [rows] = await pool.query('SELECT * FROM lesson_plan_templates WHERE id = ?', [templateId])
     res.json(rows[0])
   } catch (err) {

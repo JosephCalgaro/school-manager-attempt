@@ -92,6 +92,12 @@ export function logEvent(level = 'INFO', event, data = {}) {
 export async function getRecentLogs(req, res) {
   try {
     const { limit = 200, level, school_id } = req.query
+
+    // SaaS owner deve especificar school_id para evitar vazamento cross-school
+    if (!school_id) {
+      return res.status(400).json({ error: 'school_id é obrigatório para consultar logs' })
+    }
+
     let raw
     try {
       raw = await fsPromises.readFile(LOG_FILE, 'utf8')
@@ -107,10 +113,10 @@ export async function getRecentLogs(req, res) {
       .filter(Boolean)
 
     const filtered = lines.filter(l => {
-      if (level     && l.level    !== level.toUpperCase())    return false
-      if (school_id && String(l.schoolId) !== String(school_id)) return false
+      if (level && l.level !== level.toUpperCase()) return false
+      if (String(l.schoolId) !== String(school_id)) return false
       return true
-    }).reverse()  // mais recente primeiro
+    }).reverse()
 
     res.json(filtered)
   } catch (err) {

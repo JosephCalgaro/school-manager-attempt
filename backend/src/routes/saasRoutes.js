@@ -8,6 +8,7 @@ import {
   updateSchool, toggleSchool, deleteSchool,
 } from '../controllers/schoolsController.js'
 import { getRecentLogs } from '../middlewares/logger.js'
+import { saasRateLimiter } from '../middlewares/rateLimiter.js'
 
 const router = Router()
 
@@ -23,6 +24,7 @@ function requireSaasKey(req, res, next) {
 }
 
 router.use(requireSaasKey)
+router.use(saasRateLimiter)
 
 router.get('/dashboard',                  getSaasDashboard)
 router.get('/logs',                       getRecentLogs)

@@ -155,6 +155,10 @@ export async function updateSchool(req, res) {
   if (!Number.isInteger(id)) return res.status(400).json({ error: 'ID inválido' })
   const { name, cnpj, email, phone, address, plan, is_active, monthly_fee } = req.body || {}
   try {
+    // Busca estado atual para audit trail completo
+    const [[before]] = await pool.query('SELECT * FROM schools WHERE id = ?', [id])
+    if (!before) return res.status(404).json({ error: 'Escola não encontrada' })
+
     const fields = []; const values = []
     if (name        !== undefined) { fields.push('name = ?');        values.push(name) }
     if (cnpj        !== undefined) { fields.push('cnpj = ?');        values.push(cnpj || null) }
@@ -165,8 +169,21 @@ export async function updateSchool(req, res) {
     if (is_active   !== undefined) { fields.push('is_active = ?');   values.push(is_active ? 1 : 0) }
     if (monthly_fee !== undefined) { fields.push('monthly_fee = ?'); values.push(monthly_fee ?? 0) }
     if (!fields.length) return res.status(400).json({ error: 'Nenhum campo para atualizar' })
+
     const [result] = await pool.query(`UPDATE schools SET ${fields.join(', ')} WHERE id = ?`, [...values, id])
     if (!result.affectedRows) return res.status(404).json({ error: 'Escola não encontrada' })
+
+    // Audit trail completo para operacoes do SaaS owner
+    logEvent('INFO', 'SAAS_SCHOOL_UPDATED', {
+      schoolId: id,
+      schoolName: before.name,
+      isTempImpersonation: req.isTemp || false,
+      changes: {
+        before: Object.fromEntries(fields.map((f, i) => [f.split(' = ')[0], before[f.split(' = ')[0]]])),
+        after:  Object.fromEntries(fields.map((f, i) => [f.split(' = ')[0], values[i]])),
+      }
+    })
+
     res.json({ message: 'Escola atualizada' })
   } catch (err) { 
     console.error('Erro ao atualizar escola:', err)
@@ -186,6 +203,7 @@ export async function updateSchool(req, res) {
 export async function toggleSchool(req, res) {
   const id = Number(req.params.id)
   if (!Number.isInteger(id)) return res.status(400).json({ error: 'ID inválido' })
+  if (req.isTemp) return res.status(403).json({ error: 'Operação não permitida durante impersonação' })
   try {
     const [[s]] = await pool.query('SELECT is_active FROM schools WHERE id = ?', [id])
     if (!s) return res.status(404).json({ error: 'Escola não encontrada' })
@@ -210,8 +228,8 @@ export async function toggleSchool(req, res) {
 export async function deleteSchool(req, res) {
   const id = Number(req.params.id)
   if (!Number.isInteger(id)) return res.status(400).json({ error: 'ID inválido' })
-  // Proteção: não permite deletar a escola padrão (id=1)
   if (id === 1) return res.status(400).json({ error: 'Não é possível deletar a escola padrão' })
+  if (req.isTemp) return res.status(403).json({ error: 'Operação não permitida durante impersonação' })
   try {
     const [result] = await pool.query('DELETE FROM schools WHERE id = ?', [id])
     if (!result.affectedRows) return res.status(404).json({ error: 'Escola não encontrada' })
@@ -219,8 +237,7 @@ export async function deleteSchool(req, res) {
     res.json({ message: 'Escola removida' })
   } catch (err) {
     console.error(err)
-    // FK violation = escola tem dados vinculados
-    if (err?.code === 'ER_ROW_IS_REFERENCED_2') {
+    if (err?.code?.startsWith('ER_ROW_IS_REFERENCED')) {
       return res.status(409).json({ error: 'Escola possui dados vinculados. Desative-a em vez de deletar.' })
     }
     res.status(500).json({ error: 'Erro ao deletar escola' })

@@ -64,8 +64,8 @@ export function verifyToken(token) {
  */
 
 // POST /auth/login
-// Verifica primeiro na tabela users (admin/teacher/secretary),
-// depois na tabela students — tudo em uma única requisição.
+// Busca email em users/students/responsibles com uma unica query (UNION ALL)
+// para evitar timing side-channel e reduzir latencia.
 export async function login(req, res) {
   const { email, password } = req.body
   if (!email || !password) {
@@ -73,89 +73,58 @@ export async function login(req, res) {
   }
 
   try {
-    // 1. Tenta usuário comum
-    const [userRows] = await pool.query(
-      'SELECT id, full_name, email, password_hash, role, is_active, school_id FROM users WHERE email = ?',
-      [email]
+    // Busca unificada nas 3 tabelas — 1 round trip em vez de 3
+    const [rows] = await pool.query(
+      `SELECT id, full_name, email, password_hash, role, is_active, school_id, 'USER' AS source
+       FROM users WHERE email = ?
+       UNION ALL
+       SELECT id, full_name, email, password_hash, 'STUDENT' AS role, is_active, school_id, 'STUDENT' AS source
+       FROM students WHERE email = ?
+       UNION ALL
+       SELECT id, full_name, email, password_hash, 'RESPONSIBLE' AS role, is_active, school_id, 'RESPONSIBLE' AS source
+       FROM responsibles WHERE email = ?`,
+      [email, email, email]
     )
 
-    if (userRows.length > 0) {
-      const user = userRows[0]
-
-      if (!user.is_active) {
-        recordFailedLogin(getIp(req))
-        return res.status(403).json({ error: 'Usuário inativo' })
-      }
-
-      const match = await bcrypt.compare(password, user.password_hash)
-      if (!match) {
-        recordFailedLogin(getIp(req))
-        return res.status(401).json({ error: 'Credenciais inválidas' })
-      }
-
-      clearLoginAttempts(getIp(req))
-      const token = signToken(user)
-      delete user.password_hash
-      return res.json({ user, token })
+    if (rows.length === 0) {
+      // Dummy compare para evitar timing side-channel
+      //翻了 bcrypt sempre roda, mesmo para emails inexistentes
+      await bcrypt.compare(password, '$2a$10$dummyhashforconstanttime')
+      recordFailedLogin(getIp(req))
+      return res.status(401).json({ error: 'Credenciais inválidas' })
     }
 
-    // 2. Tenta aluno
-    const [studentRows] = await pool.query(
-      'SELECT id, full_name, email, password_hash, is_active, school_id FROM students WHERE email = ?',
-      [email]
-    )
+    const account = rows[0]
 
-    if (studentRows.length > 0) {
-      const student = studentRows[0]
-      if (!student.is_active) {
-        recordFailedLogin(getIp(req))
-        return res.status(403).json({ error: 'Aluno inativo' })
-      }
-      if (!student.password_hash) {
-        recordFailedLogin(getIp(req))
-        return res.status(403).json({ error: 'Acesso não configurado. Contate a secretaria.' })
-      }
-      const match = await bcrypt.compare(password, student.password_hash)
-      if (!match) {
-        recordFailedLogin(getIp(req))
-        return res.status(401).json({ error: 'Credenciais inválidas' })
-      }
-      clearLoginAttempts(getIp(req))
-      const token = signToken({ id: student.id, role: 'STUDENT', school_id: student.school_id })
-      delete student.password_hash
-      return res.json({ user: { ...student, role: 'STUDENT' }, token })
+    if (!account.is_active) {
+      recordFailedLogin(getIp(req))
+      return res.status(403).json({ error: 'Credenciais inválidas' })
     }
 
-    // 3. Tenta responsável
-    const [respRows] = await pool.query(
-      'SELECT id, full_name, email, password_hash, is_active, school_id FROM responsibles WHERE email = ?',
-      [email]
-    )
-
-    if (respRows.length > 0) {
-      const resp = respRows[0]
-      if (!resp.is_active) {
-        recordFailedLogin(getIp(req))
-        return res.status(403).json({ error: 'Responsável inativo' })
-      }
-      if (!resp.password_hash) {
-        recordFailedLogin(getIp(req))
-        return res.status(403).json({ error: 'Senha não configurada. Contate a secretaria para definir sua senha.' })
-      }
-      const match = await bcrypt.compare(password, resp.password_hash)
-      if (!match) {
-        recordFailedLogin(getIp(req))
-        return res.status(401).json({ error: 'Credenciais inválidas' })
-      }
-      clearLoginAttempts(getIp(req))
-      const token = signToken({ id: resp.id, role: 'RESPONSIBLE', school_id: resp.school_id })
-      delete resp.password_hash
-      return res.json({ user: { ...resp, role: 'RESPONSIBLE' }, token })
+    if (!account.password_hash) {
+      recordFailedLogin(getIp(req))
+      return res.status(403).json({ error: 'Credenciais inválidas' })
     }
 
-    recordFailedLogin(getIp(req))
-    return res.status(401).json({ error: 'Email não encontrado. Verifique suas credenciais.' })
+    const match = await bcrypt.compare(password, account.password_hash)
+    if (!match) {
+      recordFailedLogin(getIp(req))
+      return res.status(401).json({ error: 'Credenciais inválidas' })
+    }
 
+    clearLoginAttempts(getIp(req))
+
+    const payload = {
+      sub:       account.id,
+      role:      account.role,
+      school_id: account.school_id,
+    }
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRES_IN })
+
+    delete account.password_hash
+    delete account.source
+
+    return res.json({ user: account, token })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Erro ao realizar login' })

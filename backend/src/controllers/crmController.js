@@ -869,7 +869,12 @@ export async function toggleActivity(req, res) {
   const actId = Number(req.params.actId)
   if (!Number.isInteger(actId)) return res.status(400).json({ error: 'ID inválido' })
   try {
-    const [[act]] = await pool.query('SELECT * FROM crm_activities WHERE id = ?', [actId])
+    const [[act]] = await pool.query(
+      `SELECT a.*, l.school_id FROM crm_activities a
+       JOIN crm_leads l ON l.id = a.lead_id
+       WHERE a.id = ? AND l.school_id = ?`,
+      [actId, req.schoolId]
+    )
     if (!act) return res.status(404).json({ error: 'Atividade não encontrada' })
 
     const isDone = Number(act.done) === 1

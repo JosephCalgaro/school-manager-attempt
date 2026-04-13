@@ -37,7 +37,7 @@ async function isUserActive(userId, role) {
     return true
   } catch (err) {
     console.error('Erro ao verificar status do usuário:', err)
-    return true  // em caso de falha no DB, deixa passar (fail-open)
+    return false  // fail-closed: se DB falhar, usuário fica bloqueado
   }
 }
 

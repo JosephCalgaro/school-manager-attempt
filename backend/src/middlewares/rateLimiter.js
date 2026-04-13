@@ -63,13 +63,56 @@ export function clearLoginAttempts(ip) {
   attempts.delete(ip)
 }
 
-// Limpeza periódica para evitar crescimento da memória
+// ─── SaaS route rate limiter ──────────────────────────────────────────────────
+// Complementa o header x-saas-key com rate limiting por IP.
+// Protege contra abuse mesmo que a chave seja comprometida.
+
+const SAAS_RATE_LIMIT  = 60            // max 60 req por janela
+const SAAS_WINDOW_MS   = 60 * 1000     // janela de 1 minuto
+const saasAttacks       = new Map()    // ip → { count, firstAttempt, blocked }
+
+export function saasRateLimiter(req, res, next) {
+  const ip  = getIp(req)
+  const now = Date.now()
+  const rec = saasAttacks.get(ip)
+
+  if (rec) {
+    if (rec.blockedUntil && now < rec.blockedUntil) {
+      return res.status(429).json({ error: 'Too many requests. Slow down.' })
+    }
+    if (now - rec.firstAttempt > SAAS_WINDOW_MS) {
+      saasAttacks.delete(ip)
+    } else if (rec.count >= SAAS_RATE_LIMIT) {
+      // limite excedido — bloqueia imediatamente, nao permite request
+      rec.blockedUntil = now + SAAS_WINDOW_MS
+      saasAttacks.set(ip, rec)
+      return res.status(429).json({ error: 'Too many requests. Slow down.' })
+    }
+  }
+
+  const entry = saasAttacks.get(ip) || { count: 0, firstAttempt: now }
+  entry.count++
+  entry.firstAttempt = now
+  saasAttacks.set(ip, entry)
+
+  next()
+}
+
+// Limpeza periódica para evitar crescimento da memória — agora cobre ambos os Maps
 setInterval(() => {
   const now = Date.now()
+  // limpa login attempts
   for (const [ip, rec] of attempts.entries()) {
     const expired = rec.blockedUntil
       ? now > rec.blockedUntil
       : now - rec.firstAttempt > WINDOW_DURATION
     if (expired) attempts.delete(ip)
+  }
+  // limpa saasAttacks
+  for (const [ip, rec] of saasAttacks.entries()) {
+    const expired = rec.blockedUntil
+      ? now > rec.blockedUntil
+      : now - rec.firstAttempt > SAAS_WINDOW_MS
+    if (expired) saasAttacks.delete(ip)
   }
 }, 5 * 60 * 1000) // a cada 5 minutos

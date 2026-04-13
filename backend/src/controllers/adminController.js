@@ -104,11 +104,15 @@ export const toggleStudentActive = async (req, res) => {
   try {
     const [[s]] = await pool.query('SELECT is_active FROM students WHERE id = ? AND school_id = ?', [id, sid])
     if (!s) return res.status(404).json({ message: 'Aluno não encontrado' })
-    const newStatus     = s.is_active ? 0 : 1
-    const deactivatedAt = newStatus === 0 ? 'NOW()' : 'NULL'
+    const newStatus = s.is_active ? 0 : 1
+    // parameterized CASE expression — no string interpolation
     await pool.query(
-      `UPDATE students SET is_active = ?, deactivated_at = ${deactivatedAt}, deactivation_reason = ? WHERE id = ? AND school_id = ?`,
-      [newStatus, newStatus === 0 ? (deactivation_reason || null) : null, id, sid]
+      `UPDATE students
+       SET is_active = ?,
+           deactivated_at = CASE WHEN ? = 0 THEN NOW() ELSE NULL END,
+           deactivation_reason = ?
+       WHERE id = ? AND school_id = ?`,
+      [newStatus, newStatus, newStatus === 0 ? (deactivation_reason || null) : null, id, sid]
     )
     res.json({ is_active: newStatus, message: newStatus ? 'Aluno reativado' : 'Aluno desativado' })
   } catch (error) {
