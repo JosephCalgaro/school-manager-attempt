@@ -22,9 +22,6 @@ Manage students, classes, teachers, assignments, attendance, grades, CRM leads, 
 - [Quick Start](#-quick-start)
 - [API Overview](#-api-overview)
 - [Database](#-database)
-- [Security](#-security)
-- [Deployment](#-deployment)
-- [Contributing](#-contributing)
 - [License](#-license)
 
 ---
