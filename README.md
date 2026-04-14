@@ -1,356 +1,372 @@
 # 🎓 School Manager
 
-![GitHub repo
-size](https://img.shields.io/github/repo-size/JosephCalgaro/school-manager-attempt)
+![GitHub repo size](https://img.shields.io/github/repo-size/JosephCalgaro/school-manager-attempt)
+![React](https://img.shields.io/badge/React-18-blue)
+![Node](https://img.shields.io/badge/Node.js-Express-green)
+![MySQL](https://img.shields.io/badge/Database-MySQL-orange)
 
+A **full-stack School Management SaaS** with multi-tenant architecture. Built with **React (frontend)** and **Node.js + Express (backend)**.
 
-A **full-stack School Management System** built with **React
-(frontend)** and **Node.js + Express (backend)**.
+Manage students, classes, teachers, assignments, attendance, grades, CRM leads, inventory, and more — all organized by role-based access control.
 
-The platform allows administrators and teachers to manage **students,
-classes, assignments, and users** through a modern dashboard powered by
-a REST API.
+---
 
-------------------------------------------------------------------------
+## 📚 Table of Contents
 
-# 📚 Table of Contents
+- [Overview](#-overview)
+- [Features](#-features)
+- [Roles & Permissions](#-roles--permissions)
+- [Tech Stack](#-tech-stack)
+- [Architecture](#-architecture)
+- [Project Structure](#-project-structure)
+- [Quick Start](#-quick-start)
+- [API Overview](#-api-overview)
+- [Database](#-database)
+- [Security](#-security)
+- [Deployment](#-deployment)
+- [Contributing](#-contributing)
+- [License](#-license)
 
--   Overview
--   Architecture
--   Tech Stack
--   Project Structure
--   API Documentation
--   Database
--   Installation
--   Environment Variables
--   Running the Project
--   Roadmap
+---
 
-------------------------------------------------------------------------
+## 🚀 Overview
 
-# 🚀 Overview
+| Layer | Description |
+|-------|-------------|
+| Frontend | React 18 + TypeScript + Vite + TailwindCSS dashboard |
+| Backend | Node.js + Express REST API |
+| Database | MySQL relational database |
+| Authentication | JWT with 6 roles (RBAC) |
 
-  Layer            Description
-  ---------------- -------------------------------------------------
-  Frontend         React dashboard for teachers and administrators
-  Backend          REST API built with Express
-  Database         MySQL relational database
-  Authentication   JWT based authentication
+---
 
-Features:
+## ✨ Features
 
--   Student management
--   Teacher management
--   Class management
--   Assignment tracking
--   Authentication system
--   File uploads for assignments
--   Dashboard analytics
+### 🎓 Academic Management
+- Student enrollment and management
+- Class and schedule management
+- Teacher assignments
+- Responsible (guardian) linked to students
 
-------------------------------------------------------------------------
+### 👨‍🏫 Teacher Portal
+- Attendance tracking with statistics
+- Grade management
+- Assignments with file uploads
+- Lesson plans and templates
+- Class statistics dashboard
 
-# 🏗 Architecture
+### 📊 Reports (Admin)
+- Enrollment reports
+- Cancellation analysis
+- Attendance rates
+- Student performance ranking
+- CRM conversion funnel
 
-    school-manager
-    │
-    ├── frontend      React + TypeScript + Vite
-    │
-    └── backend       Node.js + Express API
-        ├── controllers
-        ├── routes
-        ├── database
-        ├── middlewares
-        └── utils
+### 📋 CRM (Secretary)
+- Lead management with custom fields
+- Kanban-style drag-and-drop funnel
+- Activity logging
+- Field customization
+- Stage transitions with notes
 
-------------------------------------------------------------------------
+### 📦 Inventory
+- Item catalog
+- Stock movements tracking
 
-# 🧰 Tech Stack
+### 🏢 SaaS Multi-tenant
+- School management
+- Impersonation for debugging
+- Audit logs
+- Usage metrics
 
-## Frontend
+### 🔐 Auth & Security
+- JWT authentication
+- Rate limiting (login protection)
+- Role-based access control
+- Timing-attack resistant login
 
--   React
--   TypeScript
--   Vite
--   TailwindCSS
--   React Router
--   ApexCharts
--   FullCalendar
+### 📤 Export
+- Client-side XLSX/CSV generation
+- Customizable field selection
 
-## Backend
+---
 
--   Node.js
--   Express
--   MySQL
--   JWT Authentication
--   bcrypt
--   Nodemon
+## 🎭 Roles & Permissions
 
-------------------------------------------------------------------------
+| Role | API Prefix | Access |
+|------|------------|--------|
+| `ADMIN` | `/admin/*` | Full access: stats, CRUD, reports, inventory, CRM, lesson plans |
+| `TEACHER` | `/teacher/*` | Own classes, attendance, grades, notes, assignments, lesson plans |
+| `SECRETARY` | `/secretary/*` | Students, classes, responsibles, CRM |
+| `STUDENT` | `/student/*` | Self-service: profile, classes, assignments, grades |
+| `RESPONSIBLE` | `/responsible/*` | Linked students, classes, assignments |
+| `SAAS_OWNER` | `/saas/*` | School management, impersonation, logs (requires `x-saas-key`) |
 
-# 📁 Project Structure
+---
 
-    school-manager
-    │
-    ├── frontend
-    │   ├── src
-    │   │   ├── components
-    │   │   ├── pages
-    │   │   ├── hooks
-    │   │   ├── context
-    │   │   ├── layout
-    │   │   └── App.tsx
-    │   │
-    │   └── vite.config.ts
-    │
-    └── backend
-        ├── src
-        │   ├── controllers
-        │   ├── routes
-        │   ├── database
-        │   ├── middlewares
-        │   └── utils
+## 🧰 Tech Stack
 
-------------------------------------------------------------------------
+### Frontend
+- **React 18** + TypeScript
+- **Vite** (build tool)
+- **TailwindCSS** (styling)
+- **React Router** (routing)
+- **TanStack Query** (data fetching)
+- **React Context** (state)
+- **ApexCharts** (charts)
+- **FullCalendar** (calendar)
+- **React DnD** (drag-and-drop)
+- **ExcelJS** (XLSX export)
+- **React Hook Form** (forms)
 
-# 📡 API Documentation
+### Backend
+- **Node.js** + **Express**
+- **MySQL** (database)
+- **JWT** (authentication)
+- **bcryptjs** (password hashing)
+- **mysql2** (MySQL driver)
+- **CORS** (cross-origin)
+- **express-rate-limit** (rate limiting)
+- **PM2** (production process manager)
 
-**Base URL**
+---
 
-    http://localhost:3000
+## 🏗 Architecture
 
-Protected routes require:
-
-    Authorization: Bearer <token>
-
-------------------------------------------------------------------------
-
-# 🔐 Authentication
-
-## Login
-
-POST `/auth/login`
-
-### Request
-
-``` json
-{
-  "email": "admin@email.com",
-  "password": "password"
-}
+```
+school-manager/
+├── frontend/                 # React SPA
+│   └── src/
+│       ├── pages/            # Organized by role
+│       │   ├── AdminPages/
+│       │   ├── TeacherPages/
+│       │   ├── SecretaryPages/
+│       │   ├── StudentPages/
+│       │   ├── ResponsiblePages/
+│       │   └── SaasPages/
+│       ├── components/       # Reusable UI
+│       ├── hooks/            # Custom hooks
+│       └── context/          # Auth context
+│
+└── backend/                  # Express API
+    └── src/
+        ├── controllers/      # Business logic
+        ├── routes/          # API routes by role
+        ├── middlewares/      # Auth, rate limiting, logging
+        ├── database/         # Connection + migrations
+        └── utils/            # Helpers
 ```
 
-### Response
+### Multi-tenant SaaS
+Each school has isolated data (`school_id` filter on all queries). SaaS owner can impersonate any school for debugging.
 
-``` json
-{
-  "token": "jwt_token",
-  "user": {
-    "id": 1,
-    "name": "Admin",
-    "role": "admin"
-  }
-}
+### Auto-migrations
+On backend startup, tables are auto-created/updated:
+- `ensureContactColumns()` — CRM custom fields
+- `initCrmTables()` — CRM tables
+- `ensureIndexes()` — Performance indexes
+
+---
+
+## 📁 Project Structure
+
+```
+frontend/src/
+├── pages/
+│   ├── AdminPages/       # AdminDashboard, AdminStudents, AdminUsers, AdminClasses, AdminReports
+│   ├── TeacherPages/     # TeacherDashboard, TeacherClassDetail, TeacherLessonPlans
+│   ├── SecretaryPages/   # SecretaryCRM, SecretaryStudents, SecretaryClasses
+│   ├── StudentPages/     # StudentDashboard
+│   ├── ResponsiblePages/ # ResponsibleDashboard
+│   └── SaasPages/        # SaasPanel
+├── components/
+│   ├── ui/               # Table, Modal, Button, etc.
+│   └── export/           # ExportModal
+├── hooks/                # useAuth, custom hooks
+├── context/              # AuthProvider
+└── utils/               # export.ts (XLSX/CSV)
+
+backend/src/
+├── controllers/          # admin, auth, crm, teacher, reports, inventory, saas, schools, responsibles, student, responsibleSelf
+├── routes/               # admin, auth, teacher, secretary, studentSelf, responsibleSelf, saas, schools
+├── middlewares/          # auth, rateLimiter, logger
+└── database/            # connection, migrations
 ```
 
-------------------------------------------------------------------------
+---
 
-## Get Profile
+## 🚀 Quick Start
 
-GET `/auth/profile`
+### Prerequisites
+- Node.js 20+
+- MySQL 8+
 
-Headers
+### Backend Setup
 
-    Authorization: Bearer token
-
-------------------------------------------------------------------------
-
-# 👨‍🎓 Students API
-
-| Method | Endpoint        | Description       |
-| ------ | --------------- | ----------------- |
-| GET    | `/students`     | Get all students  |
-| GET    | `/students/:id` | Get student by id |
-| POST   | `/students`     | Create student    |
-| PUT    | `/students/:id` | Update student    |
-| DELETE | `/students/:id` | Delete student    |
-
-
-Example:
-
-``` json
-{
-  "name": "John Doe",
-  "birth_date": "2010-05-12",
-  "phone": "123456789"
-}
+```bash
+cd backend
+npm install
 ```
 
-------------------------------------------------------------------------
+Create `.env` in `backend/`:
+```env
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=<your_db_password>
+DB_NAME=school_manager
+JWT_SECRET=<generate_strong_random_secret>
+PORT=3333
+NODE_ENV=development
+SAAS_MASTER_KEY=<generate_strong_random_key>
+```
 
-# 👩‍🏫 Teachers API
+```bash
+npm run dev   # Starts on http://localhost:3333
+```
 
-| Method | Endpoint        | Description       |
-| ------ | --------------- | ----------------- |
-| GET    | `/teachers`     | Get all teachers  |
-| GET    | `/teachers/:id` | Get teacher by id |
-| POST   | `/teachers`     | Create teacher    |
-| PUT    | `/teachers/:id` | Update teacher    |
-| DELETE | `/teachers/:id` | Delete teacher    |
+### Frontend Setup
 
+```bash
+cd frontend
+npm install
+npm run dev   # Starts on http://localhost:5173
+```
 
-------------------------------------------------------------------------
+### Development Seeds
 
-# 👥 Users API
+Default login credentials (development only):
+```
+admin@email.com / password
+teacher@email.com / password
+secretary@email.com / password
+```
 
-| Method | Endpoint     | Description    |
-| ------ | ------------ | -------------- |
-| GET    | `/users`     | Get all users  |
-| GET    | `/users/:id` | Get user by id |
-| POST   | `/users`     | Create user    |
-| PUT    | `/users/:id` | Update user    |
-| DELETE | `/users/:id` | Delete user    |
+> ⚠️ **WARNING:** These are development-only seed credentials. Change immediately in production.
 
+---
 
-------------------------------------------------------------------------
+## 📡 API Overview
 
-# 🏫 Classes API
+**Base URL:**
+```
+http://localhost:3333
+```
 
-| Method | Endpoint       | Description     |
-| ------ | -------------- | --------------- |
-| GET    | `/classes`     | Get all classes |
-| GET    | `/classes/:id` | Get class by id |
-| POST   | `/classes`     | Create class    |
-| PUT    | `/classes/:id` | Update class    |
-| DELETE | `/classes/:id` | Delete class    |
+**Authentication:**
+```
+Authorization: Bearer <jwt_token>
+```
 
-------------------------------------------------------------------------
+### Public Endpoints
 
-# 📝 Assignments API
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/auth/login` | Authenticate user |
+| GET | `/auth/profile` | Get current user profile |
 
-| Method | Endpoint           | Description         |
-| ------ | ------------------ | ------------------- |
-| GET    | `/assignments`     | Get all assignments |
-| GET    | `/assignments/:id` | Get assignment      |
-| POST   | `/assignments`     | Create assignment   |
-| PUT    | `/assignments/:id` | Update assignment   |
-| DELETE | `/assignments/:id` | Delete assignment   |
+### Admin (`/admin/*`)
 
-Assignments support file uploads stored in:
+Full access to: stats, students, users, classes, responsibles, lesson-plans, inventory, CRM, reports.
 
-    /uploads/assignments
+### Teacher (`/teacher/*`)
 
-------------------------------------------------------------------------
+Access to: own classes, attendance, grades, notes, assignments, lesson-plans, statistics.
 
-# 👪 Responsibles (Guardians)
+### Secretary (`/secretary/*`)
 
-| Method | Endpoint            | Description     |
-| ------ | ------------------- | --------------- |
-| GET    | `/responsibles`     | Get guardians   |
-| GET    | `/responsibles/:id` | Get guardian    |
-| POST   | `/responsibles`     | Create guardian |
-| PUT    | `/responsibles/:id` | Update guardian |
-| DELETE | `/responsibles/:id` | Delete guardian |
+Access to: students, classes, responsibles, CRM leads, activities, custom fields.
 
+### Student (`/student/*`)
 
-------------------------------------------------------------------------
+Self-service: profile, own classes, own assignments, own grades.
 
-# 🗄 Database
+### Responsible (`/responsible/*`)
 
-Database: **MySQL**
+Self-service: linked students, their classes and assignments.
 
-Configured in:
+### SaaS (`/saas/*`)
 
-    backend/src/database/connection.js
+Requires `x-saas-key` header. Access to: schools, impersonation, logs, metrics.
 
-------------------------------------------------------------------------
+---
 
-## Tables
+## 🗄 Database
 
-### assignment_files
+**MySQL** — configured in `backend/src/database/connection.js`
 
-| Column        | Type      |
-| ------------- | --------- |
-| id            | INT       |
-| assignment_id | INT       |
-| original_name | VARCHAR   |
-| stored_name   | VARCHAR   |
-| mime_type     | VARCHAR   |
-| size_bytes    | INT       |
-| created_at    | TIMESTAMP |
+### Tables
 
-### assignment_completions
+| Table | Description |
+|-------|-------------|
+| `users` | User accounts with roles |
+| `students` | Student records |
+| `classes` | Class definitions |
+| `responsibles` | Guardian records |
+| `student_class` | Student-class enrollment |
+| `student_responsible` | Student-guardian links |
+| `assignments` | Assignments with file support |
+| `assignment_files` | Uploaded file metadata |
+| `assignment_completions` | Student completion tracking |
+| `attendance` | Daily attendance records |
+| `grades` | Grade records |
+| `notes` | Teacher notes per student |
+| `lesson_plan_templates` | Lesson plan templates |
+| `lesson_plans` | Lesson plans |
+| `crm_leads` | CRM leads |
+| `crm_activities` | Lead activities |
+| `crm_custom_fields` | Custom field definitions |
+| `crm_lead_field_values` | Lead field values |
+| `crm_stage_logs` | Stage transition history |
+| `inventory_items` | Inventory items |
+| `inventory_movements` | Stock movements |
+| `schools` | Multi-tenant schools |
+| `saas_impersonations` | Impersonation audit |
+| `audit_logs` | General audit trail |
 
-| Column        | Type      |
-| ------------- | --------- |
-| id            | INT       |
-| assignment_id | INT       |
-| student_id    | INT       |
-| completed     | BOOLEAN   |
-| created_at    | TIMESTAMP |
-| updated_at    | TIMESTAMP |
+---
 
+## 🔒 Security
 
-Unique constraint:
+### Implemented
+- ✅ JWT authentication with expiry
+- ✅ Role-based access control (RBAC)
+- ✅ Rate limiting on login (8 attempts/minute)
+- ✅ Timing-attack resistant login (constant-time bcrypt)
+- ✅ SQL injection prevention (prepared statements)
+- ✅ Fail-closed authentication
+- ✅ Input validation
+- ✅ Audit logging
 
-    assignment_id + student_id
+### Recommendations for Production
+- Use **HTTPS** everywhere
+- Use **cookies httpOnly** instead of localStorage for JWT
+- Set `ALLOWED_ORIGINS` to specific domains (not `*`)
+- Enable **CSRF protection** if using cookies
+- Implement **password strength requirements**
+- Set up **Redis** for shared cache (deactivated users)
+- Regular **security audits**
+- **Rotate credentials** regularly
 
-------------------------------------------------------------------------
+---
 
-# ⚙️ Installation
+## 🚢 Deployment
 
-    git clone https://github.com/JosephCalgaro/school-manager-attempt.git
+Guide for deploying on Oracle Cloud (free tier) with Nginx + PM2 + Let's Encrypt SSL.
 
-------------------------------------------------------------------------
+See [DEPLOY.md](./DEPLOY.md) for complete instructions.
 
-# 🔧 Backend Setup
+---
 
-    cd backend
-    npm install
-    npm run dev
+## 🤝 Contributing
 
-Server:
+1. Fork the project
+2. Create a feature branch: `git checkout -b feature/new-feature`
+3. Commit changes: `git commit -m 'feat: add new feature'`
+4. Push to branch: `git push origin feature/new-feature`
+5. Open a Pull Request
 
-    http://localhost:3000
+---
 
-------------------------------------------------------------------------
+## 📄 License
 
-# 🎨 Frontend Setup
-
-    cd frontend
-    npm install
-    npm run dev
-
-Frontend:
-
-    http://localhost:5173
-
-------------------------------------------------------------------------
-
-# 🔑 Environment Variables
-
-Create `.env` inside `backend`:
-
-    DB_HOST=localhost
-    DB_USER=root
-    DB_PASSWORD=password
-    DB_NAME=school_manager
-    JWT_SECRET=secret
-    PORT=3333
-
-------------------------------------------------------------------------
-
-# 🛣 Roadmap
-
--   Role-based access control
--   Attendance tracking
--   Grades system
--   Notifications
--   Swagger UI documentation
--   Docker support
--   CI/CD pipeline
-
-------------------------------------------------------------------------
-
-# 📄 License
-
-This is a personal project
+This is a personal project. All rights reserved.

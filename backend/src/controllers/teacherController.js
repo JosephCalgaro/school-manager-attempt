@@ -525,9 +525,10 @@ export async function getTeacherClassById(req, res) {
       )
       totalStudents = Number(studentCountRows[0]?.totalStudents || 0)
     } catch (error) {
-      if (error.code !== 'ER_NO_SUCH_TABLE')
-      console.error('Erro ao contar alunos da turma:', error)
-      throw error
+      if (error.code !== 'ER_NO_SUCH_TABLE') {
+        console.error('Erro ao contar alunos da turma:', error)
+        throw error
+      }
     }
 
     let attendanceRate = 0

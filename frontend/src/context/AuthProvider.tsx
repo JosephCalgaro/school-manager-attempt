@@ -28,6 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken]     = useState<string | null>(null)
   const [ready, setReady]     = useState(false)
   const tokenRef              = useRef<string | null>(null)
+  const isLoggingOutRef        = useRef(false)
   const navigate              = useNavigate()
 
   // read from localStorage on mount — reject expired tokens proactively
@@ -72,13 +73,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     navigate('/')
   }
 
-  const logout = () => {
+  const logout = useCallback(() => {
+    if (isLoggingOutRef.current) return
+    isLoggingOutRef.current = true
     tokenRef.current = null
     setUser(null)
     setToken(null)
     localStorage.removeItem('auth')
     navigate('/signin')
-  }
+  }, [navigate])
 
   // Intercepts responses — on 401 (token expired/invalid), logs out and redirects to signin
   const authFetch = useCallback((input: RequestInfo, init: RequestInit = {}) => {

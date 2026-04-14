@@ -62,8 +62,8 @@ export const getAllStudents = async (req, res) => {
   try {
     const { search, status, limit = 10, offset = 0 } = req.query
     const maxLimit = 500
-    const safeLimit = Math.min(maxLimit, Math.max(1, parseInt(limit)))
-    const safeOffset = Math.max(0, parseInt(offset))
+    const safeLimit = Math.min(maxLimit, Math.max(1, parseInt(limit) || 10))
+    const safeOffset = Math.max(0, parseInt(offset) || 0)
     const conditions = ['school_id = ?']
     const params     = [sid]
 
@@ -421,8 +421,8 @@ export const getAllUsers = async (req, res) => {
   try {
     const { search, role, status, limit = 10, offset = 0 } = req.query
     const maxLimit = 500
-    const safeLimit = Math.min(maxLimit, Math.max(1, parseInt(limit)))
-    const safeOffset = Math.max(0, parseInt(offset))
+    const safeLimit = Math.min(maxLimit, Math.max(1, parseInt(limit) || 10))
+    const safeOffset = Math.max(0, parseInt(offset) || 0)
     // SAAS_OWNER nunca aparece na listagem de usuários da escola
     const conditions = ['school_id = ?', "role != 'SAAS_OWNER'", 'is_temp = 0']
     const params = [sid]

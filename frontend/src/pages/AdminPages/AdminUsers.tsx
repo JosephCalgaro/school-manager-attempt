@@ -153,10 +153,12 @@ export default function AdminUsers() {
         ...(statusFilter !== 'all' && { status: statusFilter }),
       });
       const res = await authFetch(`/admin/users?${params}`);
-      if (!res.ok) throw new Error();
+      if (!res.ok) throw new Error('Erro ao carregar usuários');
       const data = await res.json();
       setUsers(data.data); setTotal(data.total);
-    } catch { /* silent */ }
+    } catch (e) {
+      console.error('Erro ao carregar usuários:', e);
+    }
     finally { setLoading(false); }
   }, [search, roleFilter, statusFilter, page, limit, authFetch]);
 
@@ -249,7 +251,7 @@ export default function AdminUsers() {
                             <button onClick={() => handleToggle(u)} disabled={togglingId === u.id}
                               title={u.is_active ? 'Desativar' : 'Reativar'}
                               className={`flex items-center gap-1 text-sm font-medium disabled:opacity-50 transition-colors ${
-                                u.is_active ? 'text-error-600 hover:text-error-700 dark:text-error-400' : 'text-success-600 hover:text-success-700 dark:text-success-400'
+                                u.is_active ? 'text-red-600 hover:text-red-700 dark:text-red-400' : 'text-green-600 hover:text-green-700 dark:text-green-400'
                               }`}>
                               {u.is_active ? <><LuPowerOff className="h-3.5 w-3.5" /> Desativar</> : <><LuPower className="h-3.5 w-3.5" /> Reativar</>}
                             </button>

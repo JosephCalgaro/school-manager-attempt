@@ -39,7 +39,8 @@ interface SchoolForm {
 
 // ─── Helpers de API ───────────────────────────────────────────────────────────
 
-const SAAS_KEY = import.meta.env.VITE_SAAS_KEY || 'saas_dev_key_change_in_production'
+const SAAS_KEY = import.meta.env.VITE_SAAS_KEY
+if (!SAAS_KEY) throw new Error('VITE_SAAS_KEY não definido')
 
 async function saasReq(method: string, path: string, body?: unknown) {
   const res = await fetch(`/saas${path}`, {

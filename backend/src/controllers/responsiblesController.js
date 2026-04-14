@@ -34,7 +34,7 @@ export async function getAllResponsibles(req, res) {
     const where = ' WHERE ' + conditions.join(' AND ')
     const query = `SELECT id, full_name, cpf, rg, birth_date, address, email, phone, is_active, created_at FROM responsibles${where} ORDER BY is_active DESC, full_name LIMIT ? OFFSET ?`
     const count = `SELECT COUNT(*) AS total FROM responsibles${where}`
-    const [rows]   = await pool.query(query, [...params, Number(limit), Number(offset)])
+    const [rows]   = await pool.query(query, [...params, parseInt(limit) || 10, parseInt(offset) || 0])
     const [totals] = await pool.query(count, params)
     res.json({ data: rows, total: totals[0].total })
   } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao listar responsáveis' }) }

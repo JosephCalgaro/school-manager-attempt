@@ -121,6 +121,15 @@ function detailsToForm(details: StudentDetails): StudentForm {
   };
 }
 
+const DEACTIVATION_REASONS = [
+  'Financeiro',
+  'Mudança de cidade',
+  'Conclusão do curso',
+  'Insatisfação com o ensino',
+  'Problemas pessoais',
+  'Outro',
+]
+
 export default function AdminStudents() {
   const { authFetch } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
@@ -353,7 +362,7 @@ export default function AdminStudents() {
 
             <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                Mostrando {page * limit + 1} a {Math.min((page + 1) * limit, total)} de {total}
+                Mostrando {total === 0 ? 0 : page * limit + 1} a {Math.min((page + 1) * limit, total)} de {total}
               </div>
               <div className="flex gap-2">
                 <button
@@ -684,15 +693,6 @@ const R_FIELDS: RField[] = [
   { key: 'phone',      label: 'Telefone' },
   { key: 'address',    label: 'Endereço' },
   { key: 'password',   label: 'Senha de acesso', type: 'password' },
-]
-
-const DEACTIVATION_REASONS = [
-  'Financeiro',
-  'Mudança de cidade',
-  'Conclusão do curso',
-  'Insatisfação com o ensino',
-  'Problemas pessoais',
-  'Outro',
 ]
 
 function DeactivateModal({ studentName, onClose, onConfirm }: {

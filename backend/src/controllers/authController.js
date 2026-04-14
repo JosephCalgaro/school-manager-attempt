@@ -88,7 +88,7 @@ export async function login(req, res) {
 
     if (rows.length === 0) {
       // Dummy compare para evitar timing side-channel
-      //翻了 bcrypt sempre roda, mesmo para emails inexistentes
+      // bcrypt sempre roda, mesmo para emails inexistentes
       await bcrypt.compare(password, '$2a$10$dummyhashforconstanttime')
       recordFailedLogin(getIp(req))
       return res.status(401).json({ error: 'Credenciais inválidas' })
