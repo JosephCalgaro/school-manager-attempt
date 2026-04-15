@@ -36,6 +36,14 @@ export function signToken(user) {
   )
 }
 
+function parseTokenExpiryToMs(expiresIn) {
+  const match = expiresIn.match(/^(\d+)([smhd])$/)
+  if (!match) return 8 * 60 * 60 * 1000 // default 8h
+  const [, value, unit] = match
+  const multipliers = { s: 1000, m: 60000, h: 3600000, d: 86400000 }
+  return parseInt(value) * multipliers[unit]
+}
+
 /**
  * signToken - gera um JWT para o usuário
  *
@@ -121,10 +129,19 @@ export async function login(req, res) {
     }
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRES_IN })
 
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: parseTokenExpiryToMs(TOKEN_EXPIRES_IN),
+      path: '/'
+    }
+
     delete account.password_hash
     delete account.source
 
-    return res.json({ user: account, token })
+    res.cookie('token', token, cookieOptions)
+    return res.json({user: account})
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Erro ao realizar login' })
@@ -236,6 +253,11 @@ export async function getProfile(req, res) {
     console.error(err)
     res.status(500).json({ error: 'Erro ao buscar perfil' })
   }
+}
+
+export function logout(req, res){
+  res.clearCookie('token', { path: '/' })
+  res.json({ message: 'Desconectado com sucesso' })
 }
 
 /**

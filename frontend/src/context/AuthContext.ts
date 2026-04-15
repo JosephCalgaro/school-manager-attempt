@@ -14,7 +14,6 @@ export interface User {
 
 export interface AuthContextData {
   user: User | null
-  token: string | null
   login: (email: string, password: string) => Promise<void>
   logout: () => void
   authFetch: (input: RequestInfo, init?: RequestInit) => Promise<Response>

@@ -7,11 +7,11 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
-  const { token, user } = useAuth();
-  if (!token) {
+  const { user } = useAuth();
+  if (!user) {
     return <Navigate to="/signin" replace />;
   }
-  if (allowedRoles && user && !allowedRoles.includes(user.role)) {
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to="/" replace />;
   }
   return <>{children}</>;

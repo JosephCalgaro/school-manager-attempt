@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router'
 import {
   LuPlus, LuRefreshCw, LuPower, LuPowerOff,
   LuPencil, LuTrash2, LuLogIn, LuSearch,
@@ -49,6 +48,7 @@ async function saasReq(method: string, path: string, body?: unknown) {
       'Content-Type': 'application/json',
       'X-Saas-Key': SAAS_KEY,
     },
+    credentials: 'include',
     body: body ? JSON.stringify(body) : undefined,
   })
   if (!res.ok) {
@@ -352,8 +352,6 @@ function DeleteModal({
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function SaasPanel() {
-  const navigate = useNavigate()
-
   const [schools,      setSchools]      = useState<School[]>([])
   const [loading,      setLoading]      = useState(true)
   const [error,        setError]        = useState('')
@@ -383,16 +381,8 @@ export default function SaasPanel() {
   const handleEnter = async (school: School) => {
     setEntering(school.id)
     try {
-      const data = await saasReq('POST', `/schools/${school.id}/impersonate`)
-      // Salva sessão da escola (inclui is_temp e expires_at)
-      const userToStore = {
-        ...data.user,
-        is_temp:         data.is_temp    ?? false,
-        temp_expires_at: data.expires_at ?? null,
-      }
-      localStorage.setItem('auth', JSON.stringify({ user: userToStore, token: data.token }))
-      navigate('/')
-      window.location.reload()
+      await saasReq('POST', `/schools/${school.id}/impersonate`)
+      window.location.href = '/'
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Erro ao entrar na escola')
     } finally { setEntering(null) }

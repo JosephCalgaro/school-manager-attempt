@@ -42,9 +42,8 @@ async function isUserActive(userId, role) {
 }
 
 export async function authenticate(req, res, next) {
-  const auth = req.headers.authorization
-  if (!auth || !auth.startsWith('Bearer ')) return res.status(401).end()
-  const token = auth.slice(7)
+  const token = req.cookies?.token
+  if (!token) return res.status(401).json({ error: 'Não autenticado' })
   try {
     const payload = verifyToken(token)
     req.userId   = payload.sub

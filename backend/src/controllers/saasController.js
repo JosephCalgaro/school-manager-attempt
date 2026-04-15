@@ -188,8 +188,16 @@ export async function impersonateSchool(req, res) {
       expiresAt: expiresAt.toISOString(),
     })
 
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: TEMP_EXPIRES_H * 60 * 60 * 1000,
+      path: '/'
+    }
+
+    res.cookie('token', token, cookieOptions)
     return res.json({
-      token,
       is_temp:    true,
       expires_at: expiresAt.toISOString(),
       user: {

@@ -17,8 +17,14 @@ export default defineConfig({
   server: {
     allowedHosts: true,
     proxy: {
-      "/admin": "http://localhost:3333",
-      "/auth": "http://localhost:3333",
+      "/admin": {
+        target: "http://localhost:3333",
+        changeOrigin: true,
+      },
+      "/auth": {
+        target: "http://localhost:3333",
+        changeOrigin: true,
+      },
       "/students": "http://localhost:3333",
       "/student": "http://localhost:3333",
       "/users": "http://localhost:3333",
@@ -31,7 +37,10 @@ export default defineConfig({
       "/uploads": "http://localhost:3333",
       "/attendance": "http://localhost:3333",
       "/ping": "http://localhost:3333",
-      "/saas": "http://localhost:3333",
+      "/saas": {
+        target: "http://localhost:3333",
+        changeOrigin: true,
+      },
     },
   },
 });

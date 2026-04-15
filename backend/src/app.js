@@ -1,6 +1,7 @@
 import express from 'express'
 import path    from 'path'
 import cors    from 'cors'
+import cookieParser from 'cookie-parser'
 
 import pool from './database/connection.js'
 import { ensureContactColumns }           from './database/migrations.js'
@@ -21,11 +22,10 @@ import saasRoutes            from './routes/saasRoutes.js'
 const app = express()
 
 // ─── CORS ──────────────────────────────────────────────────────────────────────
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-  : true   // desenvolvimento: aceita tudo
-
-app.use(cors({ origin: allowedOrigins, credentials: true }))
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  credentials: true
+}))  
 
 // ─── Body parser ───────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '1mb' }))
@@ -46,6 +46,9 @@ initCrmTables().catch((error) => {
 ensureIndexes().catch((error) => {
   console.error('Erro ao aplicar índices:', error)
 })
+
+// ─── Cookie parser ─────────────────────────────────────────────────────────────
+app.use(cookieParser())
 
 // ─── Rotas públicas ───────────────────────────────────────────────────────────
 app.use('/auth',        authRoutes)
