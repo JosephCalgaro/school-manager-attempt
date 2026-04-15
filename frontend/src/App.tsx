@@ -57,10 +57,10 @@ export default function App() {
             <Route index path="/" element={<HomeRedirect />} />
 
             {/* Student */}
-            <Route path="/student" element={<StudentDashboard />} />
+            <Route path="/student" element={<ProtectedRoute allowedRoles={["STUDENT"]}><StudentDashboard /></ProtectedRoute>} />
 
             {/* Responsible */}
-            <Route path="/responsible" element={<ResponsibleDashboard />} />
+            <Route path="/responsible" element={<ProtectedRoute allowedRoles={["RESPONSIBLE"]}><ResponsibleDashboard /></ProtectedRoute>} />
 
             {/* Common */}
             <Route path="/profile" element={<UserProfiles />} />
@@ -91,7 +91,7 @@ export default function App() {
             <Route path="/teacher/lesson-plans" element={<TeacherLessonPlans />} />
 
             {/* SaaS Owner */}
-            <Route path="/saas" element={<SaasPanel />} />
+            <Route path="/saas" element={<ProtectedRoute allowedRoles={["SAAS_OWNER"]}><SaasPanel /></ProtectedRoute>} />
           </Route>
 
           <Route path="/signin" element={<SignIn />} />

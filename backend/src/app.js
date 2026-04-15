@@ -55,8 +55,8 @@ app.use('/admin',       authenticate, adminRoutes)
 app.use('/admin/school', authenticate, schoolsRoutes)  // escola vê ela mesma
 app.use('/teacher',     authenticate, teacherRoutes)
 app.use('/secretary',   authenticate, secretaryRoutes)
-app.use('/student',     studentSelfRoutes)
-app.use('/responsible', responsibleSelfRoutes)
+app.use('/student',     authenticate, studentSelfRoutes)
+app.use('/responsible', authenticate, responsibleSelfRoutes)
 
 // ─── Rotas SaaS owner (master key) ───────────────────────────────────────────
 app.use('/saas', saasRoutes)

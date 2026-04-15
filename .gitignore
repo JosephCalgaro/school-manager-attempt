@@ -9,3 +9,5 @@ skills-lock.json
 AGENTS.md
 node_modules/
 .gitignore
+backend/.env
+backend/.env.local

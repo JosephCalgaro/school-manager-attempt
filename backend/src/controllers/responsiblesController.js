@@ -9,7 +9,7 @@ import pool from '../database/connection.js'
  * - params: array of SQL parameter values
  * - conn: DB connection from `pool.getConnection()` when using transactions
  */
-import bcrypt from 'bcryptjs'
+import bcrypt from 'bcrypt'
 
 /**
  * getAllResponsibles - lista responsáveis com filtros e paginação
