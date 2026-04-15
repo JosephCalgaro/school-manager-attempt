@@ -22,9 +22,6 @@ Manage students, classes, teachers, assignments, attendance, grades, CRM leads, 
 - [Quick Start](#-quick-start)
 - [API Overview](#-api-overview)
 - [Database](#-database)
-- [Security](#-security)
-- [Deployment](#-deployment)
-- [Contributing](#-contributing)
 - [License](#-license)
 
 ---
@@ -231,18 +228,6 @@ cd frontend
 npm install
 npm run dev   # Starts on http://localhost:5173
 ```
-
-### Development Seeds
-
-Default login credentials (development only):
-```
-admin@email.com / password
-teacher@email.com / password
-secretary@email.com / password
-```
-
-> ⚠️ **WARNING:** These are development-only seed credentials. Change immediately in production.
-
 ---
 
 ## 📡 API Overview
@@ -322,48 +307,6 @@ Requires `x-saas-key` header. Access to: schools, impersonation, logs, metrics.
 | `schools` | Multi-tenant schools |
 | `saas_impersonations` | Impersonation audit |
 | `audit_logs` | General audit trail |
-
----
-
-## 🔒 Security
-
-### Implemented
-- ✅ JWT authentication with expiry
-- ✅ Role-based access control (RBAC)
-- ✅ Rate limiting on login (8 attempts/minute)
-- ✅ Timing-attack resistant login (constant-time bcrypt)
-- ✅ SQL injection prevention (prepared statements)
-- ✅ Fail-closed authentication
-- ✅ Input validation
-- ✅ Audit logging
-
-### Recommendations for Production
-- Use **HTTPS** everywhere
-- Use **cookies httpOnly** instead of localStorage for JWT
-- Set `ALLOWED_ORIGINS` to specific domains (not `*`)
-- Enable **CSRF protection** if using cookies
-- Implement **password strength requirements**
-- Set up **Redis** for shared cache (deactivated users)
-- Regular **security audits**
-- **Rotate credentials** regularly
-
----
-
-## 🚢 Deployment
-
-Guide for deploying on Oracle Cloud (free tier) with Nginx + PM2 + Let's Encrypt SSL.
-
-See [DEPLOY.md](./DEPLOY.md) for complete instructions.
-
----
-
-## 🤝 Contributing
-
-1. Fork the project
-2. Create a feature branch: `git checkout -b feature/new-feature`
-3. Commit changes: `git commit -m 'feat: add new feature'`
-4. Push to branch: `git push origin feature/new-feature`
-5. Open a Pull Request
 
 ---
 
