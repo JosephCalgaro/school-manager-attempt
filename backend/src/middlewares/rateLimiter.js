@@ -9,9 +9,12 @@ const WINDOW_DURATION  = 10 * 60 * 1000  // janela de 10 minutos para contagem
 const attempts = new Map() // ip -> { count, firstAttempt, blockedUntil }
 
 function getIp(req) {
-  return req.headers['x-forwarded-for']?.split(',')[0].trim()
-    || req.socket?.remoteAddress
-    || 'unknown'
+  const forwarded = req.headers['x-forwarded-for']
+  if (forwarded) {
+    const ips = forwarded.split(',').map(ip => ip.trim())
+    return ips[ips.length - 1] || req.socket?.remoteAddress || 'unknown'
+  }
+  return req.socket?.remoteAddress || 'unknown'
 }
 
 export function loginRateLimiter(req, res, next) {

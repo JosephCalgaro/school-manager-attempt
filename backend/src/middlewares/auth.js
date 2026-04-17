@@ -2,9 +2,9 @@ import { verifyToken } from '../controllers/authController.js'
 import pool from '../database/connection.js'
 
 // Cache de usuários desativados: userId → expiresAt (timestamp ms)
-// TTL de 5 min — reduz queries ao DB sem deixar tokens válidos por 8h
+// TTL de 30s — reduz queries ao DB sem deixar tokens válidos por muito tempo
 const deactivatedCache = new Map()
-const CACHE_TTL_MS = 5 * 60 * 1000
+const CACHE_TTL_MS = 30 * 1000
 
 export function markDeactivated(userId) {
   deactivatedCache.set(userId, Date.now() + CACHE_TTL_MS)

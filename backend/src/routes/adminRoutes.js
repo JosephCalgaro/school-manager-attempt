@@ -9,7 +9,7 @@ import {
   createClassAssignment, deleteClassAssignment,
   getTeacherClassById, getTeacherClasses,
   registerClassAttendance, upsertAssignmentCompletions,
-  upsertStudentNotes, updateClassAssignment,
+  upsertStudentNotes, upsertStudentNotesBulk, updateClassAssignment,
   getMyTemplates, createTemplate, updateTemplate, deleteTemplate,
   getLessonPlans, createLessonPlan, updateLessonPlan, deleteLessonPlan,
 } from '../controllers/teacherController.js'
@@ -70,6 +70,7 @@ router.put('/classes/:id',                                        adminControlle
 router.patch('/classes/:id/toggle',                               adminController.toggleClassActive)
 router.post('/classes/:id/attendance',                            registerClassAttendance)
 router.post('/classes/:id/notes',                                 upsertStudentNotes)
+router.post('/classes/:id/notes/bulk',                             upsertStudentNotesBulk)
 router.post('/classes/:id/assignments',                           createClassAssignment)
 router.put('/classes/:id/assignments/:assignmentId',              updateClassAssignment)
 router.post('/classes/:id/assignments/:assignmentId/completions', upsertAssignmentCompletions)

@@ -634,22 +634,23 @@ export default function TeacherClassDetail({ apiBase = '/teacher' }: TeacherClas
       setSavingNotes(true)
       setMessage(null)
       setError(null)
-      for (const student of studentList) {
+      const records = studentList.map(student => {
         const draft = noteDrafts[student.id] || { note1: '', note2: '', note3: '' }
-        const response = await authFetch(`${apiBase}/classes/${data.id}/notes`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            studentId: student.id,
-            note1: draft.note1 === '' ? null : Number(draft.note1),
-            note2: draft.note2 === '' ? null : Number(draft.note2),
-            note3: draft.note3 === '' ? null : Number(draft.note3)
-          })
-        })
-        if (!response.ok) {
-          const body = await response.json().catch(() => ({}))
-          throw new Error(body?.error || 'Erro ao salvar notas')
+        return {
+          studentId: student.id,
+          note1: draft.note1 === '' ? null : Number(draft.note1),
+          note2: draft.note2 === '' ? null : Number(draft.note2),
+          note3: draft.note3 === '' ? null : Number(draft.note3)
         }
+      })
+      const response = await authFetch(`${apiBase}/classes/${data.id}/notes/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ records })
+      })
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}))
+        throw new Error(body?.error || 'Erro ao salvar notas')
       }
       setMessage('Notas atualizadas com sucesso.')
       await loadClassDetail()

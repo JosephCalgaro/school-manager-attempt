@@ -9,6 +9,7 @@ import { ensureIndexes }                  from './database/indexes.js'
 import { initCrmTables }                  from './controllers/crmController.js'
 import { authenticate }                   from './middlewares/auth.js'
 import { requestLogger, errorHandler }    from './middlewares/logger.js'
+import { csrfMiddleware, createCsrfToken } from './middlewares/csrf.js'
 
 import authRoutes            from './routes/authRoutes.js'
 import adminRoutes           from './routes/adminRoutes.js'
@@ -22,10 +23,28 @@ import saasRoutes            from './routes/saasRoutes.js'
 const app = express()
 
 // ─── CORS ──────────────────────────────────────────────────────────────────────
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean)
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true)
+    } else {
+      callback(new Error(`Origem ${origin} não permitida`))
+    }
+  },
   credentials: true
-}))  
+}))
+
+app.use((err, req, res, next) => {
+  if (err.message.includes('não permitida')) {
+    return res.status(403).json({ error: 'CORS: origem não permitida' })
+  }
+  next(err)
+})  
 
 // ─── Body parser ───────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '1mb' }))
@@ -50,16 +69,22 @@ ensureIndexes().catch((error) => {
 // ─── Cookie parser ─────────────────────────────────────────────────────────────
 app.use(cookieParser())
 
+// ─── CSRF Token endpoint ───────────────────────────────────────────────────────
+app.get('/auth/csrf-token', (req, res) => {
+  createCsrfToken(req, res)
+  res.json({ csrfToken: req.cookies.__csrf })
+})
+
 // ─── Rotas públicas ───────────────────────────────────────────────────────────
 app.use('/auth',        authRoutes)
 
-// ─── Rotas autenticadas ───────────────────────────────────────────────────────
-app.use('/admin',       authenticate, adminRoutes)
-app.use('/admin/school', authenticate, schoolsRoutes)  // escola vê ela mesma
-app.use('/teacher',     authenticate, teacherRoutes)
-app.use('/secretary',   authenticate, secretaryRoutes)
-app.use('/student',     authenticate, studentSelfRoutes)
-app.use('/responsible', authenticate, responsibleSelfRoutes)
+// ─── Rotas autenticadas (com proteção CSRF) ───────────────────────────────────
+app.use('/admin',       authenticate, csrfMiddleware, adminRoutes)
+app.use('/admin/school', authenticate, csrfMiddleware, schoolsRoutes)
+app.use('/teacher',     authenticate, csrfMiddleware, teacherRoutes)
+app.use('/secretary',   authenticate, csrfMiddleware, secretaryRoutes)
+app.use('/student',     authenticate, csrfMiddleware, studentSelfRoutes)
+app.use('/responsible', authenticate, csrfMiddleware, responsibleSelfRoutes)
 
 // ─── Rotas SaaS owner (master key) ───────────────────────────────────────────
 app.use('/saas', saasRoutes)

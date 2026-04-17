@@ -151,6 +151,20 @@ async function readAssignmentCompletions(assignmentIds, totalStudents) {
   return grouped
 }
 
+const ALLOWED_MIME_TYPES = new Set([
+  'application/pdf',
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+  'image/svg+xml',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain',
+  'text/csv',
+])
+
 async function saveAssignmentFiles(assignmentId, files) {
   if (!Array.isArray(files) || files.length === 0) return []
   await ensureAssignmentFilesTable()
@@ -159,23 +173,35 @@ async function saveAssignmentFiles(assignmentId, files) {
   const savedFiles = []
   for (const file of files) {
     if (!file?.name || !file?.contentBase64) continue
-    const originalName = safeFileName(file.name)
-    const stamp = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-    const storedName = `${assignmentId}_${stamp}_${originalName}`
-    const buffer = Buffer.from(String(file.contentBase64), 'base64')
+
+    const mimeType = file.mimeType || 'application/octet-stream'
+    if (!ALLOWED_MIME_TYPES.has(mimeType)) {
+      console.warn(`[security] Upload rejeitado: MIME type não permitido ${mimeType} para ${file.name}`)
+      continue
+    }
+
+    const ext = path.extname(safeFileName(file.name)).toLowerCase() || ''
+    const storedName = `${crypto.randomUUID()}${ext}`
     const fullPath = path.join(uploadsDir, storedName)
 
+    const resolvedPath = path.resolve(fullPath)
+    if (!resolvedPath.startsWith(path.resolve(uploadsDir))) {
+      console.warn(`[security] Path traversal detectado: ${file.name}`)
+      continue
+    }
+
+    const buffer = Buffer.from(String(file.contentBase64), 'base64')
     await fs.writeFile(fullPath, buffer)
     const [result] = await pool.query(
       `INSERT INTO assignment_files (assignment_id, original_name, stored_name, mime_type, size_bytes)
        VALUES (?, ?, ?, ?, ?)`,
-      [assignmentId, file.name, storedName, file.mimeType || null, buffer.length]
+      [assignmentId, file.name, storedName, mimeType, buffer.length]
     )
     savedFiles.push({
       id: result.insertId,
       originalName: file.name,
       storedName,
-      mimeType: file.mimeType || null,
+      mimeType,
       sizeBytes: buffer.length,
       url: buildAttachmentUrl(storedName)
     })
@@ -834,8 +860,83 @@ export async function upsertStudentNotes(req, res) {
 
     res.status(201).json({ message: 'Notas atualizadas com sucesso' })
   } catch (error) {
-    console.error(error)
-    res.status(500).json({ error: error.message || 'Erro ao salvar notas' })
+    console.error('[handleSaveNotes] Erro ao salvar notas:', error.message)
+    res.status(500).json({ error: 'Erro ao salvar notas' })
+  }
+}
+
+const MAX_BULK_NOTES = 200
+
+/**
+ * upsertStudentNotesBulk - insere/atualiza notas de múltiplos alunos em transação
+ */
+export async function upsertStudentNotesBulk(req, res) {
+  const classId = Number(req.params.id)
+  const records = Array.isArray(req.body) ? req.body : req.body?.records
+
+  if (!Number.isInteger(classId)) {
+    return res.status(400).json({ error: 'ID da turma inválido' })
+  }
+  if (!Array.isArray(records) || records.length === 0) {
+    return res.status(400).json({ error: 'Nenhum registro fornecido' })
+  }
+  if (records.length > MAX_BULK_NOTES) {
+    return res.status(400).json({ error: `Máximo de ${MAX_BULK_NOTES} registros por request` })
+  }
+
+  const parseNote = (value, label) => {
+    if (value === null || value === undefined || value === '') return null
+    const parsed = Number(value)
+    if (Number.isNaN(parsed) || parsed < 0 || parsed > 10) {
+      throw new Error(`${label} deve ser um número entre 0 e 10`)
+    }
+    return parsed
+  }
+
+  let connection
+  try {
+    const classInfo = await getAccessibleClass(classId, req.userId, req.userRole, req.schoolId)
+    if (!classInfo) {
+      return res.status(404).json({ error: 'Turma não encontrada para este professor' })
+    }
+
+    const studentIds = records.map(r => Number(r.studentId))
+    const [studentRows] = await pool.query(
+      'SELECT student_id FROM class_students WHERE class_id = ? AND student_id IN (?)',
+      [classId, studentIds]
+    )
+    const validStudentIds = new Set(studentRows.map(r => r.student_id))
+    for (const sid of studentIds) {
+      if (!validStudentIds.has(sid)) {
+        return res.status(400).json({ error: `Aluno ${sid} não pertence a esta turma` })
+      }
+    }
+
+    connection = await pool.getConnection()
+    await connection.beginTransaction()
+
+    await ensureStudentNotesTable(connection)
+
+    for (const record of records) {
+      const n1 = parseNote(record.note1, 'Nota 1')
+      const n2 = parseNote(record.note2, 'Nota 2')
+      const n3 = parseNote(record.note3, 'Nota 3')
+      await connection.query(
+        `INSERT INTO student_notes (class_id, student_id, note1, note2, note3)
+         VALUES (?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE note1 = VALUES(note1), note2 = VALUES(note2), note3 = VALUES(note3)`,
+        [classId, Number(record.studentId), n1, n2, n3]
+      )
+    }
+
+    await connection.commit()
+    res.status(201).json({ message: 'Notas atualizadas com sucesso' })
+  } catch (error) {
+    if (connection) await connection.rollback()
+    console.error('[upsertStudentNotesBulk] Erro ao salvar notas:', error.message)
+    res.status(500).json({ error: 'Erro ao salvar notas' })
+  } finally {
+    if (connection) connection.release()
   }
 }
 
@@ -1115,9 +1216,6 @@ export async function deleteClassAssignment(req, res) {
 // ─── LESSON PLANS (biblioteca + vínculo por turma) ───────────────────────────
 
 async function ensureLessonPlanTables() {
-  // Migração: remover tabela antiga se existir
-  await pool.query(`DROP TABLE IF EXISTS lesson_plans`)
-
   // Biblioteca de templates (por professor)
   await pool.query(`
     CREATE TABLE IF NOT EXISTS lesson_plan_templates (

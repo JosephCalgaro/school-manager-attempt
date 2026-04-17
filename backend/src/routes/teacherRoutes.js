@@ -13,6 +13,7 @@ import {
   updateClassAssignment,
   upsertClassGrade,
   upsertStudentNotes,
+  upsertStudentNotesBulk,
   getMyTemplates,
   createTemplate,
   updateTemplate,
@@ -34,6 +35,7 @@ router.get('/classes/:id/students', getTeacherClassStudents)
 router.post('/classes/:id/attendance',                            registerClassAttendance)
 router.post('/classes/:id/grades',                                upsertClassGrade)
 router.post('/classes/:id/notes',                                 upsertStudentNotes)
+router.post('/classes/:id/notes/bulk',                             upsertStudentNotesBulk)
 router.post('/classes/:id/assignments',                           createClassAssignment)
 router.put('/classes/:id/assignments/:assignmentId',              updateClassAssignment)
 router.post('/classes/:id/assignments/:assignmentId/completions', upsertAssignmentCompletions)
