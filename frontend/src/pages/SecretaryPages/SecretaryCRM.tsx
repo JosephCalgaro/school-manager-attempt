@@ -1,10 +1,10 @@
-﻿import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import {
   LuPlus, LuX, LuPhone, LuMail, LuSearch,
   LuMessageSquare, LuCalendarDays, LuCheck, LuClock,
   LuTrash2, LuPencil, LuCircleAlert, LuBookOpen, LuArchive, LuSave,
   LuBell, LuList, LuLayoutDashboard, LuActivity, LuFilter, LuTag,
-  LuChartBar, LuTrendingUp, LuTarget, LuRotateCcw, LuTriangleAlert, LuDownload,
+  LuChartBar, LuTrendingUp, LuTarget, LuRotateCcw, LuTriangleAlert, LuDownload, LuUpload,
 } from 'react-icons/lu'
 import { TbFlame } from 'react-icons/tb'
 import { FaThermometerHalf, FaSnowflake } from 'react-icons/fa'
@@ -12,6 +12,7 @@ import { useAuth } from '../../hooks/useAuth'
 import PageMeta from '../../components/common/PageMeta'
 import { useCountdown, formatCountdown, countdownColor } from '../../hooks/useCountdown'
 import ExportModal, { DataSourceConfig } from '../../components/export/ExportModal'
+import ImportModal from '../../components/crm/ImportModal'
 
 // --- Types ---
 
@@ -26,6 +27,7 @@ type Lead = {
   source: Source; stage: Stage; lost_reason: string | null; notes: string | null
   tags: string | null
   assigned_to: number | null; assigned_name: string | null
+  created_by: number | null; created_by_name: string | null
   score: number; temperature: 'QUENTE' | 'MORNO' | 'FRIO'
   expected_enrollment_date: string | null
   archived: number; enrolled_at: string | null; lost_at: string | null
@@ -69,6 +71,15 @@ const STAGES: { key: Stage; label: string; color: string; dot: string; dropRing:
   { key: 'MATRICULADO',  label: 'Matriculado',  color: 'border-t-green-400',  dot: 'bg-green-400',  dropRing: 'ring-green-400' },
   { key: 'PERDIDO',      label: 'Perdido',      color: 'border-t-gray-400',   dot: 'bg-gray-400',   dropRing: 'ring-gray-400' },
 ]
+
+const STAGE_TEXT_COLORS: Record<Stage, string> = {
+  NOVO: 'text-blue-600 dark:text-blue-400',
+  CONTATO: 'text-amber-600 dark:text-amber-400',
+  EXPERIMENTAL: 'text-violet-600 dark:text-violet-400',
+  PROPOSTA: 'text-orange-600 dark:text-orange-400',
+  MATRICULADO: 'text-green-600 dark:text-green-400',
+  PERDIDO: 'text-gray-500 dark:text-gray-400',
+}
 
 const STAGE_MAP = Object.fromEntries(STAGES.map(s => [s.key, s])) as Record<Stage, typeof STAGES[0]>
 
@@ -1213,6 +1224,10 @@ export default function SecretaryCRM({ apiBase = '/secretary' }: { apiBase?: str
   const [showFunnel, setShowFunnel]   = useState(false)
   const [showArchive, setShowArchive] = useState(false)
   const [showExport, setShowExport]   = useState(false)
+  const [showImport, setShowImport]   = useState(false)
+  const [viewMode, setViewMode] = useState<'board' | 'list' | 'compact'>(() =>
+    (localStorage.getItem('crm-view-mode') as 'board' | 'list' | 'compact') || 'board'
+  )
   const [filter, setFilter]       = useState<Stage | 'ALL'>('ALL')
   const [globalSearch, setGlobalSearch] = useState('')
   const [listSearch, setListSearch]     = useState('')
@@ -1389,6 +1404,10 @@ export default function SecretaryCRM({ apiBase = '/secretary' }: { apiBase?: str
               className="flex shrink-0 items-center gap-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 hover:border-brand-300 transition-colors">
               <LuActivity className="h-3.5 w-3.5" /> Feed
             </button>
+            <button onClick={() => setShowImport(true)}
+              className="flex shrink-0 items-center gap-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 hover:border-brand-300 transition-colors">
+              <LuUpload className="h-3.5 w-3.5" /> Importar
+            </button>
             <button onClick={() => setShowExport(true)}
               className="flex shrink-0 items-center gap-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 hover:border-brand-300 transition-colors">
               <LuDownload className="h-3.5 w-3.5" /> Exportar
@@ -1453,6 +1472,16 @@ export default function SecretaryCRM({ apiBase = '/secretary' }: { apiBase?: str
             }`}>
             <LuLayoutDashboard className="h-3 w-3" /> Todos ({leads.length})
           </button>
+          <div className="flex rounded-full border border-gray-200 dark:border-gray-700 overflow-hidden">
+            {([['board', LuLayoutDashboard], ['list', LuList], ['compact', LuList]] as const).map(([mode, Icon]) => (
+              <button key={mode} onClick={() => { setViewMode(mode); localStorage.setItem('crm-view-mode', mode) }}
+                className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium transition-colors ${
+                  viewMode === mode ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}>
+                <Icon className="h-3 w-3" />
+              </button>
+            ))}
+          </div>
           {STAGES.map(s => {
             const cnt = leads.filter(l => l.stage === s.key).length
             return (
@@ -1495,6 +1524,24 @@ export default function SecretaryCRM({ apiBase = '/secretary' }: { apiBase?: str
                 <LuSearch className="h-8 w-8 mx-auto mb-2 opacity-40" />
                 <p className="text-sm">Nenhum lead encontrado.</p>
               </div>
+            ) : viewMode === 'compact' ? (
+              <div className="space-y-1">
+                {globalLeads.map(lead => {
+                  const sc = STAGE_MAP[lead.stage]
+                  return (
+                    <div key={lead.id} onClick={() => setOpenLead(lead)}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-brand-300 hover:shadow-sm cursor-pointer text-sm bg-white dark:bg-gray-900">
+                      <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${sc?.dot}`} />
+                      <span className="font-semibold truncate flex-1 text-gray-900 dark:text-white">{lead.name}</span>
+                      <span className={`text-xs font-medium shrink-0 ${STAGE_TEXT_COLORS[lead.stage]}`}>{sc?.label}</span>
+                      <span className="text-xs text-gray-400 shrink-0 truncate max-w-[120px]">{lead.phone || lead.email || '—'}</span>
+                      {lead.created_by_name && (
+                        <span className="text-xs text-gray-400 shrink-0 truncate max-w-[100px]">{lead.created_by_name}</span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
             ) : (
               <div className="space-y-2">
                 {globalLeads.map(lead => {
@@ -1506,21 +1553,21 @@ export default function SecretaryCRM({ apiBase = '/secretary' }: { apiBase?: str
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-semibold text-sm text-gray-900 dark:text-white truncate">{lead.name}</span>
-                          <span className="text-xs text-gray-400 rounded-full border border-gray-200 dark:border-gray-700 px-2 py-0.5">{sc?.label}</span>
+                          <span className={`text-xs font-medium rounded-full border px-2 py-0.5 ${STAGE_TEXT_COLORS[lead.stage]} border-current`}>{sc?.label}</span>
                           {lead.score != null && <ScoreBadge score={lead.score} temperature={lead.temperature ?? 'FRIO'} />}
                         </div>
                         <div className="flex gap-3 mt-0.5 text-xs text-gray-400">
-                          {lead.student_name && <span>Aluno: {lead.student_name}</span>}
                           {lead.phone && <span><LuPhone className="inline h-3 w-3 mr-0.5" />{lead.phone}</span>}
                           {lead.email && <span>{lead.email}</span>}
+                          {lead.created_by_name && <span>Criado por: {lead.created_by_name}</span>}
                         </div>
                       </div>
-                      <span className="text-xs text-gray-400 shrink-0">{SOURCE_LABELS[lead.source]}</span>
+<span className="text-xs text-gray-400 shrink-0">{SOURCE_LABELS[lead.source]}</span>
                     </div>
                   )
                 })}
               </div>
-            )}
+)}
           </div>
         ) : isListMode ? (
           /* --- Lista por estágio --- */
@@ -1548,6 +1595,24 @@ export default function SecretaryCRM({ apiBase = '/secretary' }: { apiBase?: str
                 <LuSearch className="h-8 w-8 mx-auto mb-2 opacity-40" />
                 <p className="text-sm">{listSearch ? 'Nenhum resultado.' : 'Nenhum lead neste estágio.'}</p>
               </div>
+            ) : viewMode === 'compact' ? (
+              <div className="space-y-1">
+                {listLeads.map(lead => {
+                  const sc = STAGE_MAP[lead.stage]
+                  return (
+                    <div key={lead.id} onClick={() => setOpenLead(lead)}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-brand-300 hover:shadow-sm cursor-pointer text-sm bg-white dark:bg-gray-900">
+                      <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${sc?.dot}`} />
+                      <span className="font-semibold truncate flex-1 text-gray-900 dark:text-white">{lead.name}</span>
+                      <span className={`text-xs font-medium shrink-0 ${STAGE_TEXT_COLORS[lead.stage]}`}>{sc?.label}</span>
+                      <span className="text-xs text-gray-400 shrink-0 truncate max-w-[120px]">{lead.phone || lead.email || '—'}</span>
+                      {lead.created_by_name && (
+                        <span className="text-xs text-gray-400 shrink-0 truncate max-w-[100px]">{lead.created_by_name}</span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {listLeads.map(lead => (
@@ -1557,6 +1622,69 @@ export default function SecretaryCRM({ apiBase = '/secretary' }: { apiBase?: str
               </div>
             )}
           </div>
+        ) : viewMode === 'compact' || viewMode === 'list' ? (
+          /* --- Compact/List — todos os estágios (filtro ALL) --- */
+          (() => {
+            const visible = leads.filter(l => !['MATRICULADO','PERDIDO'].includes(l.stage))
+            const compact = viewMode === 'compact'
+            return (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Todos os leads</span>
+                  <span className="rounded-full bg-gray-200 dark:bg-gray-700 px-2 py-0.5 text-xs font-medium text-gray-600 dark:text-gray-400">{visible.length}</span>
+                </div>
+                {visible.length === 0 ? (
+                  <div className="text-center py-16 text-gray-400">
+                    <LuLayoutDashboard className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                    <p className="text-sm">Nenhum lead ativo.</p>
+                  </div>
+                ) : compact ? (
+                  <div className="space-y-1">
+                    {visible.map(lead => {
+                      const sc = STAGE_MAP[lead.stage]
+                      return (
+                        <div key={lead.id} onClick={() => setOpenLead(lead)}
+                          className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-brand-300 hover:shadow-sm cursor-pointer text-sm bg-white dark:bg-gray-900">
+                          <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${sc?.dot}`} />
+                          <span className="font-semibold truncate flex-1 text-gray-900 dark:text-white">{lead.name}</span>
+                          <span className={`text-xs font-medium shrink-0 ${STAGE_TEXT_COLORS[lead.stage]}`}>{sc?.label}</span>
+                          <span className="text-xs text-gray-400 shrink-0 truncate max-w-[120px]">{lead.phone || lead.email || '—'}</span>
+                          {lead.created_by_name && (
+                            <span className="text-xs text-gray-400 shrink-0 truncate max-w-[100px]">{lead.created_by_name}</span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {visible.map(lead => {
+                      const sc = STAGE_MAP[lead.stage]
+                      return (
+                        <div key={lead.id} onClick={() => setOpenLead(lead)}
+                          className="flex items-center gap-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 cursor-pointer hover:border-brand-300 hover:shadow-sm transition-all">
+                          <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${sc?.dot}`} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold text-sm text-gray-900 dark:text-white truncate">{lead.name}</span>
+                              <span className={`text-xs font-medium rounded-full border px-2 py-0.5 ${STAGE_TEXT_COLORS[lead.stage]} border-current`}>{sc?.label}</span>
+                              {lead.score != null && <ScoreBadge score={lead.score} temperature={lead.temperature ?? 'FRIO'} />}
+                            </div>
+                            <div className="flex gap-3 mt-0.5 text-xs text-gray-400">
+                              {lead.phone && <span><LuPhone className="inline h-3 w-3 mr-0.5" />{lead.phone}</span>}
+                              {lead.email && <span>{lead.email}</span>}
+                              {lead.created_by_name && <span>Criado por: {lead.created_by_name}</span>}
+                            </div>
+                          </div>
+                          <span className="text-xs text-gray-400 shrink-0">{SOURCE_LABELS[lead.source]}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })()
         ) : (
           /* --- Kanban --- */
           <div ref={boardRef} onDragOver={handleBoardDragOver}
@@ -1633,6 +1761,14 @@ export default function SecretaryCRM({ apiBase = '/secretary' }: { apiBase?: str
             apiBase={apiBase}
             dataSource={crmExportConfig(apiBase)}
             defaultFilename="leads-crm"
+          />
+        )}
+        {showImport && (
+          <ImportModal
+            isOpen={showImport}
+            onClose={() => setShowImport(false)}
+            onSuccess={load}
+            apiBase={apiBase}
           />
         )}
       </div>

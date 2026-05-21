@@ -71,8 +71,8 @@ app.use(cookieParser())
 
 // ─── CSRF Token endpoint ───────────────────────────────────────────────────────
 app.get('/auth/csrf-token', (req, res) => {
-  createCsrfToken(req, res)
-  res.json({ csrfToken: req.cookies.__csrf })
+  const token = createCsrfToken(req, res)
+  res.json({ csrfToken: token })
 })
 
 // ─── Rotas públicas ───────────────────────────────────────────────────────────

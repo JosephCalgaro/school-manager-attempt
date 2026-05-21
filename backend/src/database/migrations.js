@@ -268,9 +268,19 @@ async function ensureSaasOwnerRole() {
 // A impersonação é 100% baseada no JWT; estas colunas no banco não são mais lidas.
 // A função é mantida aqui apenas para referência histórica, mas não é mais chamada.
 
+// ─── CRM created_by ────────────────────────────────────────────────────────────
+async function ensureCrmCreatedBy() {
+  await addColumnIfMissing('crm_leads', 'created_by INT NULL')
+  await pool.query(`
+    UPDATE crm_leads SET created_by = assigned_to
+    WHERE created_by IS NULL AND assigned_to IS NOT NULL
+  `)
+}
+
 // ─── EXPORT PRINCIPAL ─────────────────────────────────────────────────────────
 export async function ensureContactColumns() {
   await ensureSchoolsTable()
+  await ensureCrmCreatedBy()
   await addColumnIfMissing('schools', 'monthly_fee DECIMAL(8,2) NOT NULL DEFAULT 0.00')
   await addPhoneColumnIfMissing('users')
   await addPhoneColumnIfMissing('students')

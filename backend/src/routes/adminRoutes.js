@@ -23,6 +23,7 @@ import {
   checkDuplicate, getArchivedLeads, reactivateLead,
   getCustomFields, createCustomField, updateCustomField, deleteCustomField,
   getLeadFieldValues, upsertLeadFieldValues,
+  importLeads,
 } from '../controllers/crmController.js'
 import {
   enrollmentsByMonth, cancellationsByMonth, attendanceAll,
@@ -125,6 +126,7 @@ router.put('/crm/custom-fields/:fieldId',     updateCustomField)
 router.delete('/crm/custom-fields/:fieldId',  deleteCustomField)
 router.get('/crm/leads/:id/field-values',     getLeadFieldValues)
 router.put('/crm/leads/:id/field-values',     upsertLeadFieldValues)
+router.post('/crm/leads/import',              importLeads)
 
 // Relatórios pedagógicos
 router.get('/reports/enrollments-by-month',   enrollmentsByMonth)

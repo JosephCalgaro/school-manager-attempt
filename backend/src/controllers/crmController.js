@@ -65,6 +65,7 @@ async function ensureCrmTables() {
       last_activity_at         DATETIME     NULL,
       created_at               TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at               TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      created_by               INT          NULL,
       INDEX idx_crm_stage    (stage),
       INDEX idx_crm_school   (school_id),
       INDEX idx_crm_score    (score),
@@ -264,7 +265,7 @@ async function recalcScore(leadId) {
 // ─── Helper: subquery de agregados ────────────────────────────────────────────
 
 const LEAD_AGG_SQL = `
-  SELECT l.*, u.full_name AS assigned_name,
+  SELECT l.*, u.full_name AS assigned_name, c.full_name AS created_by_name,
     COALESCE(agg.total_activities, 0)  AS total_activities,
     COALESCE(agg.pending_followups, 0) AS pending_followups,
     COALESCE(agg.done_followups, 0)    AS done_followups,
@@ -274,6 +275,7 @@ const LEAD_AGG_SQL = `
     COALESCE(exp_agg.done_exp_classes, 0)    AS done_exp_classes
   FROM crm_leads l
   LEFT JOIN users u ON u.id = l.assigned_to
+  LEFT JOIN users c ON c.id = l.created_by
   LEFT JOIN (
     SELECT lead_id,
       COUNT(id) AS total_activities,
@@ -498,12 +500,12 @@ export async function createLead(req, res) {
     const [r] = await pool.query(
       `INSERT INTO crm_leads
        (school_id, name, phone, email, cpf, rg, student_name, age_range, source,
-        notes, assigned_to, tags, expected_enrollment_date, cpf_normalized, phone_normalized)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        notes, assigned_to, tags, expected_enrollment_date, cpf_normalized, phone_normalized, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [sid, name.trim(), phone||null, email||null, cpf||null, rg||null,
        student_name||null, age_range||null, source||'OUTRO', notes||null,
        assigned_to||req.userId, tags||null, expected_enrollment_date||null,
-       cpfNorm, phoneNorm]
+       cpfNorm, phoneNorm, req.userId]
     )
     await pool.query(
       `INSERT INTO crm_stage_logs (lead_id, school_id, from_stage, to_stage, changed_by, note)
@@ -516,6 +518,135 @@ export async function createLead(req, res) {
     )
     res.status(201).json(rows[0])
   } catch (err) { console.error(err); res.status(500).json({ error: 'Erro ao criar lead' }) }
+}
+
+// ─── importLeads ───────────────────────────────────────────────────────────────
+
+const MAX_IMPORT_BATCH = 1000
+
+export async function importLeads(req, res) {
+  const sid = req.schoolId
+  const { leads = [], options = {} } = req.body || {}
+  const { skipDuplicates = true, defaultSource = 'OUTRO' } = options
+
+  if (!Array.isArray(leads) || leads.length === 0) {
+    return res.status(400).json({ error: 'Nenhum lead para importar' })
+  }
+  if (leads.length > MAX_IMPORT_BATCH) {
+    return res.status(400).json({ error: `Máximo de ${MAX_IMPORT_BATCH} leads por importação` })
+  }
+
+  let connection
+  try {
+    connection = await pool.getConnection()
+    await connection.beginTransaction()
+
+    const validLeads = []
+    const errors = []
+
+    for (let i = 0; i < leads.length; i++) {
+      const lead = leads[i]
+      if (!lead.name?.trim()) {
+        errors.push({ row: i, message: 'Nome obrigatório' })
+        continue
+      }
+      const cpfNorm   = lead.cpf   ? lead.cpf.replace(/\D/g, '')   : null
+      const phoneNorm = lead.phone ? lead.phone.replace(/\D/g, '') : null
+      const source = ['INDICACAO','INSTAGRAM','GOOGLE','SITE','OUTRO'].includes(lead.source)
+        ? lead.source : defaultSource
+
+      validLeads.push({
+        name: lead.name.trim(),
+        phone: lead.phone || null,
+        email: lead.email || null,
+        cpf: lead.cpf || null,
+        rg: lead.rg || null,
+        student_name: lead.student_name || null,
+        age_range: lead.age_range || null,
+        source,
+        notes: lead.notes || null,
+        tags: lead.tags || null,
+        expected_enrollment_date: lead.expected_enrollment_date || null,
+        cpf_normalized: cpfNorm,
+        phone_normalized: phoneNorm,
+      })
+    }
+
+    if (validLeads.length === 0) {
+      await connection.rollback()
+      return res.status(400).json({ error: 'Nenhum lead válido para importar', errors })
+    }
+
+    const checkFields = []
+    const checkValues = []
+    if (skipDuplicates) {
+      for (const lead of validLeads) {
+        if (lead.phone_normalized) {
+          checkFields.push('phone_normalized = ?')
+          checkValues.push(lead.phone_normalized)
+        }
+        if (lead.cpf_normalized) {
+          checkFields.push('cpf_normalized = ?')
+          checkValues.push(lead.cpf_normalized)
+        }
+      }
+    }
+
+    const inserted = []
+    for (let i = 0; i < validLeads.length; i++) {
+      const lead = validLeads[i]
+
+      if (skipDuplicates && (lead.phone_normalized || lead.cpf_normalized)) {
+        const conditions = []
+        const vals = [sid]
+        if (lead.phone_normalized) {
+          conditions.push('phone_normalized = ?')
+          vals.push(lead.phone_normalized)
+        }
+        if (lead.cpf_normalized) {
+          conditions.push('cpf_normalized = ?')
+          vals.push(lead.cpf_normalized)
+        }
+        const [existing] = await connection.query(
+          `SELECT id FROM crm_leads WHERE school_id = ? AND (${conditions.join(' OR ')}) LIMIT 1`,
+          vals
+        )
+        if (existing.length > 0) continue
+      }
+
+      const [r] = await connection.query(
+        `INSERT INTO crm_leads
+         (school_id, name, phone, email, cpf, rg, student_name, age_range, source,
+          notes, tags, expected_enrollment_date, cpf_normalized, phone_normalized, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [sid, lead.name, lead.phone, lead.email, lead.cpf, lead.rg,
+         lead.student_name, lead.age_range, lead.source, lead.notes, lead.tags,
+         lead.expected_enrollment_date, lead.cpf_normalized, lead.phone_normalized, req.userId]
+      )
+
+      await connection.query(
+        `INSERT INTO crm_stage_logs (lead_id, school_id, from_stage, to_stage, changed_by, note)
+         VALUES (?, ?, NULL, 'NOVO', ?, 'Importado em lote')`,
+        [r.insertId, sid, req.userId]
+      )
+      await recalcScore(r.insertId)
+      inserted.push(r.insertId)
+    }
+
+    await connection.commit()
+    res.status(201).json({
+      imported: inserted.length,
+      skipped: validLeads.length - inserted.length,
+      errors,
+      ids: inserted,
+    })
+  } catch (err) {
+    if (connection) await connection.rollback()
+    console.error('[importLeads] Erro:', err)
+    res.status(500).json({ error: 'Erro ao importar leads' })
+  } finally {
+    if (connection) connection.release()
+  }
 }
 
 // ─── updateLead ───────────────────────────────────────────────────────────────
